@@ -44,7 +44,37 @@ Sensors created by this integration follow a predictable pattern and are created
 - `sensor.<pet>_daily_pee_count` / `sensor.<pet>_daily_poоп_count` — counts for today
 - `sensor.<pet>_medication_<med_id>_last_dose` — medication-specific sensors (created when you configure medications in options)
 
-Entity attributes often include `visit_id`, `confirmed`, timestamps and additional observation details (notes, consistencies, urine amount, etc.). Use these attributes to build automations or dashboards.
+The integration also creates additional sensors to help monitor hydration, food, wellbeing and other vitals. Common additional sensors:
+
+- Drink sensors:
+  - `sensor.<pet>_last_drink` — timestamp of last drink
+  - `sensor.<pet>_daily_drink_count` — number of drink records today
+  - `sensor.<pet>_last_drink_amount` — amount of last drink
+
+- Meal sensors:
+  - `sensor.<pet>_last_meal` — timestamp of last meal
+  - `sensor.<pet>_daily_meal_count` — number of meals today
+  - `sensor.<pet>_last_meal_amount` — amount of last meal
+
+- Thirst / Appetite / Wellbeing:
+  - `sensor.<pet>_last_thirst_level` / `sensor.<pet>_current_thirst_level`
+  - `sensor.<pet>_last_appetite_level` / `sensor.<pet>_current_appetite_level`
+  - `sensor.<pet>_last_wellbeing_assessment` / `sensor.<pet>_current_wellbeing_score`
+
+- Weight tracking:
+  - `sensor.<pet>_last_weight` — timestamp of last weight measurement
+  - `sensor.<pet>_current_weight` — most recent weight (grams)
+  - `sensor.<pet>_weight_change_7d` / `sensor.<pet>_weight_change_30d` — change in grams
+
+- Vomiting tracking:
+  - `sensor.<pet>_last_vomit` — timestamp of last vomiting incident
+  - `sensor.<pet>_last_vomit_type` — type of last vomit (hairball/food/bile/...)
+  - `sensor.<pet>_daily_vomit_count` / `sensor.<pet>_weekly_vomit_count`
+
+- Administrative / review:
+  - `sensor.<pet>_unconfirmed_visits_count` — number of unconfirmed AI/automatic visits
+
+Entity attributes often include `visit_id`, `confirmed`, timestamps and additional observation details (notes, consistencies, urine amount, amounts, symptoms, weight_grams, etc.). Use these attributes to build automations or dashboards.
 
 ## Services
 
@@ -59,6 +89,8 @@ The integration exposes multiple services (see `services.yaml`). Key services in
 - `pet_health.log_drink` — Record water intake.
 - `pet_health.log_meal` — Record food intake.
 - `pet_health.log_thirst` / `pet_health.log_appetite` / `pet_health.log_wellbeing` — Log assessments.
+ - `pet_health.log_weight` — Record a weight measurement.
+ - `pet_health.log_vomit` — Record a vomiting incident.
 
 Example: log a bathroom visit via Developer Tools → Services
 
@@ -80,6 +112,26 @@ data:
   config_entry_id: <your-pet-config-entry-id>
   medication_id: "abc123"
   notes: "Given with food"
+```
+
+Example: log a weight measurement
+
+```yaml
+service: pet_health.log_weight
+data:
+  config_entry_id: <your-pet-config-entry-id>
+  weight_grams: 3500
+  notes: "Routine monthly weigh-in"
+```
+
+Example: log a vomiting incident
+
+```yaml
+service: pet_health.log_vomit
+data:
+  config_entry_id: <your-pet-config-entry-id>
+  vomit_type: hairball
+  notes: "Small hairball, otherwise normal"
 ```
 
 Replace `<your-pet-config-entry-id>` with the config entry selected in the service UI or copied from the integration entry.
