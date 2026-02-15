@@ -14,8 +14,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
-from .models import BathroomVisit, PetHealthConfigEntry
+from .const import CONF_MEDICATIONS, DOMAIN
+from .models import BathroomVisit, MedicationRecord, PetHealthConfigEntry
 from .store import PetHealthStore
 
 
@@ -40,6 +40,22 @@ async def async_setup_entry(
         DailyPoopCountSensor(entry, store, pet_data.pet_id),
     ]
 
+    # Add medication sensors for each configured medication
+    medications = entry.options.get(CONF_MEDICATIONS, [])
+    for medication in medications:
+        med_id = medication["medication_id"]
+        med_name = medication["medication_name"]
+        sensors.extend(
+            [
+                LastMedicationDoseSensor(
+                    entry, store, pet_data.pet_id, med_id, med_name
+                ),
+                DailyMedicationCountSensor(
+                    entry, store, pet_data.pet_id, med_id, med_name
+                ),
+            ]
+        )
+
     async_add_entities(sensors)
 
 
@@ -59,6 +75,11 @@ class PetHealthSensorBase(SensorEntity):
         self._pet_data = entry.runtime_data
         self._attr_device_info = self._pet_data.device_info()
         self._remove_update_tracker = None
+        # Common attributes for all pet health sensors
+        self._attr_extra_state_attributes = {
+            "pet": self._pet_data.name,
+            "integration": DOMAIN,
+        }
 
     async def async_added_to_hass(self) -> None:
         """Register callbacks when entity is added."""
@@ -104,6 +125,26 @@ class PetHealthSensorBase(SensorEntity):
                 dt_util.as_utc(v.timestamp)
                 if v.timestamp.tzinfo is None
                 else v.timestamp
+            )
+            >= since_aware
+        ]
+
+    def _get_medications(self) -> list[MedicationRecord]:
+        """Get all medication records for this pet."""
+        return self._store.get_medications(self._pet_id)
+
+    def _get_medications_since(self, since: datetime) -> list[MedicationRecord]:
+        """Get medication records since a given time."""
+        medications = self._get_medications()
+        # Ensure both timestamps are timezone-aware for comparison
+        since_aware = dt_util.as_utc(since) if since.tzinfo is None else since
+        return [
+            m
+            for m in medications
+            if (
+                dt_util.as_utc(m.timestamp)
+                if m.timestamp.tzinfo is None
+                else m.timestamp
             )
             >= since_aware
         ]
@@ -357,3 +398,93 @@ class DailyPoopCountSensor(PetHealthSensorBase):
         visits_today = self._get_visits_since(today_start)
         poop_visits = [v for v in visits_today if v.did_poop]
         self._attr_native_value = len(poop_visits)
+
+
+class LastMedicationDoseSensor(PetHealthSensorBase):
+    """Sensor showing the timestamp of the last medication dose."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self,
+        entry: PetHealthConfigEntry,
+        store: PetHealthStore,
+        pet_id: str,
+        medication_id: str,
+        medication_name: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._medication_id = medication_id
+        self._medication_name = medication_name
+        self._attr_unique_id = f"{pet_id}_medication_{medication_id}_last_dose"
+        self._attr_translation_key = "last_medication_dose"
+        self._attr_translation_placeholders = {
+            "medication_name": medication_name,
+        }
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        medications = self._get_medications()
+        # Filter by medication name
+        med_doses = [
+            m for m in medications if m.medication_name == self._medication_name
+        ]
+
+        if med_doses:
+            last_dose = max(med_doses, key=lambda m: m.timestamp)
+            self._attr_native_value = dt_util.as_utc(last_dose.timestamp)
+            # Update attributes while preserving base attributes
+            self._attr_extra_state_attributes = {
+                "pet": self._pet_data.name,
+                "integration": DOMAIN,
+                "medication_id": self._medication_id,
+                "medication_name": last_dose.medication_name,
+                "dosage": last_dose.dosage,
+                "unit": last_dose.unit,
+                "notes": last_dose.notes,
+            }
+        else:
+            self._attr_native_value = None
+            self._attr_extra_state_attributes = {
+                "pet": self._pet_data.name,
+                "integration": DOMAIN,
+                "medication_id": self._medication_id,
+            }
+
+
+class DailyMedicationCountSensor(PetHealthSensorBase):
+    """Sensor counting medication doses given today."""
+
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = "doses"
+    _attr_icon = "mdi:pill"
+
+    def __init__(
+        self,
+        entry: PetHealthConfigEntry,
+        store: PetHealthStore,
+        pet_id: str,
+        medication_id: str,
+        medication_name: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._medication_id = medication_id
+        self._medication_name = medication_name
+        self._attr_unique_id = f"{pet_id}_medication_{medication_id}_daily_count"
+        self._attr_translation_key = "daily_medication_count"
+        self._attr_translation_placeholders = {
+            "medication_name": medication_name,
+        }
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        now = dt_util.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        medications_today = self._get_medications_since(today_start)
+        # Filter by medication name
+        med_doses_today = [
+            m for m in medications_today if m.medication_name == self._medication_name
+        ]
+        self._attr_native_value = len(med_doses_today)

@@ -62,7 +62,7 @@ class PetHealthConfigFlow(ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> PetHealthOptionsFlow:
         """Get the options flow for this handler."""
-        return PetHealthOptionsFlow(config_entry)
+        return PetHealthOptionsFlow()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -124,11 +124,8 @@ class PetHealthConfigFlow(ConfigFlow, domain=DOMAIN):
 class PetHealthOptionsFlow(OptionsFlow):
     """Handle options flow for Pet Health."""
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
-        self._medication_id: str | None = None
-        self._editing_medication: dict[str, Any] | None = None
+    _medication_id: str | None = None
+    _editing_medication: dict[str, Any] | None = None
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

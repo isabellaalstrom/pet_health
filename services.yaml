@@ -87,7 +87,7 @@ log_bathroom_visit:
 
 log_medication:
   name: Log medication
-  description: Record a medication given to a pet
+  description: Record a medication dose given to a pet. Configure medications in pet options first, then you can see the medication ID in the sensor entity names (e.g., sensor.ziggy_medication_abc123_last_dose).
   fields:
     config_entry_id:
       name: Pet
@@ -96,28 +96,10 @@ log_medication:
       selector:
         config_entry:
           integration: pet_health
-    medication_name:
-      name: Medication name
-      description: The name of the medication
+    medication_id:
+      name: Medication ID
+      description: "The medication ID (found in sensor names: sensor.{pet}_medication_{ID}_last_dose)"
       required: true
-      selector:
-        text:
-    dosage:
-      name: Dosage
-      description: The dosage amount (e.g., "10", "5.5")
-      required: false
-      selector:
-        text:
-    unit:
-      name: Unit
-      description: The unit of measurement (e.g., "mg", "ml", "tablets")
-      required: false
-      selector:
-        text:
-    reason:
-      name: Reason
-      description: The reason for the medication (e.g., "flea prevention", "antibiotics")
-      required: false
       selector:
         text:
     given_at:
@@ -128,7 +110,7 @@ log_medication:
         datetime:
     notes:
       name: Notes
-      description: Additional notes about the medication
+      description: Additional notes about this dose
       required: false
       selector:
         text:

@@ -112,6 +112,12 @@
       },
       "daily_poop_count": {
         "name": "Daily poop visits"
+      },
+      "last_medication_dose": {
+        "name": "Medication {medication_name} last dose"
+      },
+      "daily_medication_count": {
+        "name": "Medication {medication_name} doses today"
       }
     }
   },
@@ -152,27 +158,15 @@
     },
     "log_medication": {
       "name": "Log medication",
-      "description": "Record a medication given to a pet",
+      "description": "Record a medication dose. Find medication ID in sensor entity names.",
       "fields": {
         "config_entry_id": {
           "name": "Pet",
           "description": "The pet that received the medication"
         },
-        "medication_name": {
-          "name": "Medication name",
-          "description": "The name of the medication"
-        },
-        "dosage": {
-          "name": "Dosage",
-          "description": "The dosage amount"
-        },
-        "unit": {
-          "name": "Unit",
-          "description": "The unit of measurement (e.g., mg, ml, tablets)"
-        },
-        "reason": {
-          "name": "Reason",
-          "description": "The reason for the medication"
+        "medication_id": {
+          "name": "Medication ID",
+          "description": "The full UUID from sensor attributes. Find it in Developer Tools > States > Your medication sensor > medication_id attribute (e.g., 3abbc4af93ce468a90348f82f2c0ee80)"
         },
         "given_at": {
           "name": "Given at",
@@ -180,7 +174,7 @@
         },
         "notes": {
           "name": "Notes",
-          "description": "Additional notes about the medication"
+          "description": "Additional notes about this dose"
         }
       }
     }

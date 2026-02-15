@@ -27,8 +27,10 @@ from .const import (
     ATTR_REASON,
     ATTR_UNIT,
     ATTR_URINE_AMOUNT,
+    CONF_MEDICATION_DOSAGE,
     CONF_MEDICATION_ID,
     CONF_MEDICATION_NAME,
+    CONF_MEDICATION_UNIT,
     CONF_MEDICATIONS,
     CONF_PET_ID,
     CONF_PET_NAME,
@@ -236,7 +238,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: PetHealthConfigEntry) ->
     if _PLATFORMS:
         await hass.config_entries.async_forward_entry_setups(entry, _PLATFORMS)
 
+    # Listen for options updates and reload entry (to create new medication sensors)
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+
     return True
+
+
+async def async_reload_entry(hass: HomeAssistant, entry: PetHealthConfigEntry) -> None:
+    """Reload the config entry when options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: PetHealthConfigEntry) -> bool:
