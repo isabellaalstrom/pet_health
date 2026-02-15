@@ -9,7 +9,16 @@ from datetime import datetime
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from .const import DOMAIN, PetType, PoopColor, PoopConsistency, UrineAmount
+from .const import (
+    DOMAIN,
+    ConsumptionAmount,
+    LevelState,
+    PetType,
+    PoopColor,
+    PoopConsistency,
+    UrineAmount,
+    WellbeingScore,
+)
 
 
 @dataclass
@@ -128,6 +137,157 @@ class MedicationRecord:
             dosage=data.get("dosage"),
             unit=data.get("unit"),
             reason=data.get("reason"),
+            notes=data.get("notes"),
+        )
+
+
+@dataclass
+class DrinkRecord:
+    """Data model for a drinking record."""
+
+    timestamp: datetime
+    pet_id: str
+    amount: ConsumptionAmount = ConsumptionAmount.NORMAL
+    notes: str | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage."""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "pet_id": self.pet_id,
+            "amount": self.amount,
+            "notes": self.notes,
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> DrinkRecord:
+        """Create from dictionary."""
+        return DrinkRecord(
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            pet_id=data["pet_id"],
+            amount=ConsumptionAmount(data.get("amount", "normal")),
+            notes=data.get("notes"),
+        )
+
+
+@dataclass
+class MealRecord:
+    """Data model for an eating record."""
+
+    timestamp: datetime
+    pet_id: str
+    amount: ConsumptionAmount = ConsumptionAmount.NORMAL
+    food_type: str | None = None
+    notes: str | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage."""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "pet_id": self.pet_id,
+            "amount": self.amount,
+            "food_type": self.food_type,
+            "notes": self.notes,
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> MealRecord:
+        """Create from dictionary."""
+        return MealRecord(
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            pet_id=data["pet_id"],
+            amount=ConsumptionAmount(data.get("amount", "normal")),
+            food_type=data.get("food_type"),
+            notes=data.get("notes"),
+        )
+
+
+@dataclass
+class ThirstLevelRecord:
+    """Data model for a thirst level assessment."""
+
+    timestamp: datetime
+    pet_id: str
+    level: LevelState = LevelState.NORMAL
+    notes: str | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage."""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "pet_id": self.pet_id,
+            "level": self.level,
+            "notes": self.notes,
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> ThirstLevelRecord:
+        """Create from dictionary."""
+        return ThirstLevelRecord(
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            pet_id=data["pet_id"],
+            level=LevelState(data.get("level", "normal")),
+            notes=data.get("notes"),
+        )
+
+
+@dataclass
+class AppetiteLevelRecord:
+    """Data model for an appetite level assessment."""
+
+    timestamp: datetime
+    pet_id: str
+    level: LevelState = LevelState.NORMAL
+    notes: str | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage."""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "pet_id": self.pet_id,
+            "level": self.level,
+            "notes": self.notes,
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> AppetiteLevelRecord:
+        """Create from dictionary."""
+        return AppetiteLevelRecord(
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            pet_id=data["pet_id"],
+            level=LevelState(data.get("level", "normal")),
+            notes=data.get("notes"),
+        )
+
+
+@dataclass
+class WellbeingRecord:
+    """Data model for a wellbeing assessment."""
+
+    timestamp: datetime
+    pet_id: str
+    wellbeing_score: WellbeingScore
+    symptoms: list[str] = field(default_factory=list)
+    notes: str | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage."""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "pet_id": self.pet_id,
+            "wellbeing_score": self.wellbeing_score,
+            "symptoms": self.symptoms,
+            "notes": self.notes,
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> WellbeingRecord:
+        """Create from dictionary."""
+        return WellbeingRecord(
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            pet_id=data["pet_id"],
+            wellbeing_score=WellbeingScore(data["wellbeing_score"]),
+            symptoms=data.get("symptoms", []),
             notes=data.get("notes"),
         )
 

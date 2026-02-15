@@ -121,6 +121,42 @@
       },
       "daily_medication_count": {
         "name": "Medication {medication_name} doses today"
+      },
+      "last_drink": {
+        "name": "Last drink"
+      },
+      "daily_drink_count": {
+        "name": "Daily drinks"
+      },
+      "last_drink_amount": {
+        "name": "Last drink amount"
+      },
+      "last_meal": {
+        "name": "Last meal"
+      },
+      "daily_meal_count": {
+        "name": "Daily meals"
+      },
+      "last_meal_amount": {
+        "name": "Last meal amount"
+      },
+      "last_thirst_level": {
+        "name": "Last thirst level"
+      },
+      "current_thirst_level": {
+        "name": "Current thirst level"
+      },
+      "last_appetite_level": {
+        "name": "Last appetite level"
+      },
+      "current_appetite_level": {
+        "name": "Current appetite level"
+      },
+      "last_wellbeing_assessment": {
+        "name": "Last wellbeing assessment"
+      },
+      "current_wellbeing_score": {
+        "name": "Current wellbeing score"
       }
     }
   },
@@ -250,6 +286,124 @@
         "notes": {
           "name": "Notes",
           "description": "Update notes about this visit"
+        }
+      }
+    },
+    "log_drink": {
+      "name": "Log drink",
+      "description": "Record water consumption for a pet",
+      "fields": {
+        "config_entry_id": {
+          "name": "Pet",
+          "description": "The pet that had water"
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "The amount of water consumed"
+        },
+        "logged_at": {
+          "name": "Logged at",
+          "description": "When the water was consumed. If not specified, uses current time."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Additional notes about water consumption"
+        }
+      }
+    },
+    "log_meal": {
+      "name": "Log meal",
+      "description": "Record food consumption for a pet",
+      "fields": {
+        "config_entry_id": {
+          "name": "Pet",
+          "description": "The pet that had food"
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "The amount of food consumed"
+        },
+        "food_type": {
+          "name": "Food type",
+          "description": "The type of food consumed (e.g., dry kibble, wet food, treats)"
+        },
+        "logged_at": {
+          "name": "Logged at",
+          "description": "When the food was consumed. If not specified, uses current time."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Additional notes about food consumption"
+        }
+      }
+    },
+    "log_thirst": {
+      "name": "Log thirst level",
+      "description": "Record thirst level assessment for a pet (normal, lessened, or increased)",
+      "fields": {
+        "config_entry_id": {
+          "name": "Pet",
+          "description": "The pet being assessed"
+        },
+        "level": {
+          "name": "Thirst level",
+          "description": "The level of thirst (normal, lessened, or increased)"
+        },
+        "logged_at": {
+          "name": "Logged at",
+          "description": "When the assessment occurred. If not specified, uses current time."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Additional notes about thirst level"
+        }
+      }
+    },
+    "log_appetite": {
+      "name": "Log appetite level",
+      "description": "Record appetite level assessment for a pet (normal, lessened, or increased)",
+      "fields": {
+        "config_entry_id": {
+          "name": "Pet",
+          "description": "The pet being assessed"
+        },
+        "level": {
+          "name": "Appetite level",
+          "description": "The level of appetite (normal, lessened, or increased)"
+        },
+        "logged_at": {
+          "name": "Logged at",
+          "description": "When the assessment occurred. If not specified, uses current time."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Additional notes about appetite level"
+        }
+      }
+    },
+    "log_wellbeing": {
+      "name": "Log wellbeing",
+      "description": "Record a wellbeing assessment for a pet",
+      "fields": {
+        "config_entry_id": {
+          "name": "Pet",
+          "description": "The pet being assessed"
+        },
+        "wellbeing_score": {
+          "name": "Wellbeing score",
+          "description": "Overall wellbeing assessment"
+        },
+        "symptoms": {
+          "name": "Symptoms",
+          "description": "List of symptoms or concerns (one per line)"
+        },
+        "logged_at": {
+          "name": "Logged at",
+          "description": "When the assessment occurred. If not specified, uses current time."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Additional notes about wellbeing"
         }
       }
     }

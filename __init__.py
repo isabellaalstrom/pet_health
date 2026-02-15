@@ -14,21 +14,27 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    ATTR_AMOUNT,
     ATTR_CONFIG_ENTRY_ID,
     ATTR_CONFIRMED,
     ATTR_DID_PEE,
     ATTR_DID_POOP,
     ATTR_DOSAGE,
+    ATTR_FOOD_TYPE,
     ATTR_GIVEN_AT,
+    ATTR_LEVEL,
+    ATTR_LOGGED_AT,
     ATTR_MEDICATION_ID,
     ATTR_MEDICATION_NAME,
     ATTR_NOTES,
     ATTR_POOP_COLOR,
     ATTR_POOP_CONSISTENCIES,
     ATTR_REASON,
+    ATTR_SYMPTOMS,
     ATTR_UNIT,
     ATTR_URINE_AMOUNT,
     ATTR_VISIT_ID,
+    ATTR_WELLBEING_SCORE,
     CONF_MEDICATION_DOSAGE,
     CONF_MEDICATION_ID,
     CONF_MEDICATION_NAME,
@@ -41,15 +47,33 @@ from .const import (
     SERVICE_AMEND_VISIT,
     SERVICE_CONFIRM_VISIT,
     SERVICE_DELETE_VISIT,
+    SERVICE_LOG_APPETITE,
     SERVICE_LOG_BATHROOM_VISIT,
+    SERVICE_LOG_DRINK,
+    SERVICE_LOG_MEAL,
     SERVICE_LOG_MEDICATION,
+    SERVICE_LOG_THIRST,
+    SERVICE_LOG_WELLBEING,
     SERVICE_REASSIGN_VISIT,
+    ConsumptionAmount,
+    LevelState,
     PetType,
     PoopColor,
     PoopConsistency,
     UrineAmount,
+    WellbeingScore,
 )
-from .models import BathroomVisit, MedicationRecord, PetData, PetHealthConfigEntry
+from .models import (
+    AppetiteLevelRecord,
+    BathroomVisit,
+    DrinkRecord,
+    MealRecord,
+    MedicationRecord,
+    PetData,
+    PetHealthConfigEntry,
+    ThirstLevelRecord,
+    WellbeingRecord,
+)
 from .store import PetHealthStore
 
 _LOGGER = logging.getLogger(__name__)
@@ -118,6 +142,66 @@ SERVICE_AMEND_VISIT_SCHEMA = vol.Schema(
         ),
         vol.Optional(ATTR_POOP_COLOR): vol.In([c.value for c in PoopColor]),
         vol.Optional(ATTR_URINE_AMOUNT): vol.In([a.value for a in UrineAmount]),
+        vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
+# Schema for log_drink service (water consumption)
+SERVICE_LOG_DRINK_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Optional(ATTR_AMOUNT, default="normal"): vol.In(
+            [a.value for a in ConsumptionAmount]
+        ),
+        vol.Optional(ATTR_LOGGED_AT): cv.datetime,
+        vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
+# Schema for log_meal service (food consumption)
+SERVICE_LOG_MEAL_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Optional(ATTR_AMOUNT, default="normal"): vol.In(
+            [a.value for a in ConsumptionAmount]
+        ),
+        vol.Optional(ATTR_FOOD_TYPE): cv.string,
+        vol.Optional(ATTR_LOGGED_AT): cv.datetime,
+        vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
+# Schema for log_thirst service (thirst level assessment)
+SERVICE_LOG_THIRST_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Optional(ATTR_LEVEL, default="normal"): vol.In(
+            [l.value for l in LevelState]
+        ),
+        vol.Optional(ATTR_LOGGED_AT): cv.datetime,
+        vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
+# Schema for log_appetite service (appetite level assessment)
+SERVICE_LOG_APPETITE_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Optional(ATTR_LEVEL, default="normal"): vol.In(
+            [l.value for l in LevelState]
+        ),
+        vol.Optional(ATTR_LOGGED_AT): cv.datetime,
+        vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
+# Schema for log_wellbeing service
+SERVICE_LOG_WELLBEING_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Required(ATTR_WELLBEING_SCORE): vol.In([s.value for s in WellbeingScore]),
+        vol.Optional(ATTR_SYMPTOMS): vol.All(cv.ensure_list, [cv.string]),
+        vol.Optional(ATTR_LOGGED_AT): cv.datetime,
         vol.Optional(ATTR_NOTES): cv.string,
     }
 )
@@ -353,6 +437,228 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         else:
             raise HomeAssistantError(f"Visit {visit_id} not found")
 
+    async def handle_log_drink(call: ServiceCall) -> ServiceResponse:
+        """Handle the log_drink service call (water consumption)."""
+        entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
+        entry = hass.config_entries.async_get_entry(entry_id)
+
+        if not entry:
+            raise HomeAssistantError(f"Config entry {entry_id} not found")
+
+        if entry.domain != DOMAIN:
+            raise HomeAssistantError(
+                f"Config entry {entry_id} is not a pet_health entry"
+            )
+
+        pet_data: PetData = entry.runtime_data
+
+        # Get timestamp (use provided or current)
+        logged_at = call.data.get(ATTR_LOGGED_AT)
+        if logged_at is None:
+            logged_at = dt_util.now()
+        else:
+            logged_at = dt_util.as_utc(logged_at)
+
+        # Create drink record
+        record = DrinkRecord(
+            timestamp=logged_at,
+            pet_id=pet_data.pet_id,
+            amount=ConsumptionAmount(call.data.get(ATTR_AMOUNT, "normal")),
+            notes=call.data.get(ATTR_NOTES),
+        )
+
+        await store.async_save_drink(record)
+        _LOGGER.info(
+            "Logged drink (%s) for %s at %s",
+            record.amount,
+            pet_data.name,
+            record.timestamp,
+        )
+
+        return {
+            "timestamp": record.timestamp.isoformat(),
+            "pet_name": pet_data.name,
+            "amount": record.amount,
+        }
+
+    async def handle_log_meal(call: ServiceCall) -> ServiceResponse:
+        """Handle the log_meal service call (food consumption)."""
+        entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
+        entry = hass.config_entries.async_get_entry(entry_id)
+
+        if not entry:
+            raise HomeAssistantError(f"Config entry {entry_id} not found")
+
+        if entry.domain != DOMAIN:
+            raise HomeAssistantError(
+                f"Config entry {entry_id} is not a pet_health entry"
+            )
+
+        pet_data: PetData = entry.runtime_data
+
+        # Get timestamp (use provided or current)
+        logged_at = call.data.get(ATTR_LOGGED_AT)
+        if logged_at is None:
+            logged_at = dt_util.now()
+        else:
+            logged_at = dt_util.as_utc(logged_at)
+
+        # Create meal record
+        record = MealRecord(
+            timestamp=logged_at,
+            pet_id=pet_data.pet_id,
+            amount=ConsumptionAmount(call.data.get(ATTR_AMOUNT, "normal")),
+            food_type=call.data.get(ATTR_FOOD_TYPE),
+            notes=call.data.get(ATTR_NOTES),
+        )
+
+        await store.async_save_meal(record)
+        _LOGGER.info(
+            "Logged meal (%s) for %s at %s",
+            record.amount,
+            pet_data.name,
+            record.timestamp,
+        )
+
+        return {
+            "timestamp": record.timestamp.isoformat(),
+            "pet_name": pet_data.name,
+            "amount": record.amount,
+        }
+
+    async def handle_log_thirst(call: ServiceCall) -> ServiceResponse:
+        """Handle the log_thirst service call (thirst level assessment)."""
+        entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
+        entry = hass.config_entries.async_get_entry(entry_id)
+
+        if not entry:
+            raise HomeAssistantError(f"Config entry {entry_id} not found")
+
+        if entry.domain != DOMAIN:
+            raise HomeAssistantError(
+                f"Config entry {entry_id} is not a pet_health entry"
+            )
+
+        pet_data: PetData = entry.runtime_data
+
+        # Get timestamp (use provided or current)
+        logged_at = call.data.get(ATTR_LOGGED_AT)
+        if logged_at is None:
+            logged_at = dt_util.now()
+        else:
+            logged_at = dt_util.as_utc(logged_at)
+
+        # Create thirst level record
+        record = ThirstLevelRecord(
+            timestamp=logged_at,
+            pet_id=pet_data.pet_id,
+            level=LevelState(call.data.get(ATTR_LEVEL, "normal")),
+            notes=call.data.get(ATTR_NOTES),
+        )
+
+        await store.async_save_thirst_level(record)
+        _LOGGER.info(
+            "Logged thirst level (%s) for %s at %s",
+            record.level,
+            pet_data.name,
+            record.timestamp,
+        )
+
+        return {
+            "timestamp": record.timestamp.isoformat(),
+            "pet_name": pet_data.name,
+            "level": record.level,
+        }
+
+    async def handle_log_appetite(call: ServiceCall) -> ServiceResponse:
+        """Handle the log_appetite service call (appetite level assessment)."""
+        entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
+        entry = hass.config_entries.async_get_entry(entry_id)
+
+        if not entry:
+            raise HomeAssistantError(f"Config entry {entry_id} not found")
+
+        if entry.domain != DOMAIN:
+            raise HomeAssistantError(
+                f"Config entry {entry_id} is not a pet_health entry"
+            )
+
+        pet_data: PetData = entry.runtime_data
+
+        # Get timestamp (use provided or current)
+        logged_at = call.data.get(ATTR_LOGGED_AT)
+        if logged_at is None:
+            logged_at = dt_util.now()
+        else:
+            logged_at = dt_util.as_utc(logged_at)
+
+        # Create appetite level record
+        record = AppetiteLevelRecord(
+            timestamp=logged_at,
+            pet_id=pet_data.pet_id,
+            level=LevelState(call.data.get(ATTR_LEVEL, "normal")),
+            notes=call.data.get(ATTR_NOTES),
+        )
+
+        await store.async_save_appetite_level(record)
+        _LOGGER.info(
+            "Logged appetite level (%s) for %s at %s",
+            record.level,
+            pet_data.name,
+            record.timestamp,
+        )
+
+        return {
+            "timestamp": record.timestamp.isoformat(),
+            "pet_name": pet_data.name,
+            "level": record.level,
+        }
+
+    async def handle_log_wellbeing(call: ServiceCall) -> ServiceResponse:
+        """Handle the log_wellbeing service call."""
+        entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
+        entry = hass.config_entries.async_get_entry(entry_id)
+
+        if not entry:
+            raise HomeAssistantError(f"Config entry {entry_id} not found")
+
+        if entry.domain != DOMAIN:
+            raise HomeAssistantError(
+                f"Config entry {entry_id} is not a pet_health entry"
+            )
+
+        pet_data: PetData = entry.runtime_data
+
+        # Get timestamp (use provided or current)
+        logged_at = call.data.get(ATTR_LOGGED_AT)
+        if logged_at is None:
+            logged_at = dt_util.now()
+        else:
+            logged_at = dt_util.as_utc(logged_at)
+
+        # Create wellbeing record
+        record = WellbeingRecord(
+            timestamp=logged_at,
+            pet_id=pet_data.pet_id,
+            wellbeing_score=WellbeingScore(call.data[ATTR_WELLBEING_SCORE]),
+            symptoms=call.data.get(ATTR_SYMPTOMS, []),
+            notes=call.data.get(ATTR_NOTES),
+        )
+
+        await store.async_save_wellbeing(record)
+        _LOGGER.info(
+            "Logged wellbeing (%s) for %s at %s",
+            record.wellbeing_score,
+            pet_data.name,
+            record.timestamp,
+        )
+
+        return {
+            "timestamp": record.timestamp.isoformat(),
+            "pet_name": pet_data.name,
+            "wellbeing_score": record.wellbeing_score,
+        }
+
     # Register services
     hass.services.async_register(
         DOMAIN,
@@ -399,6 +705,46 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         SERVICE_AMEND_VISIT,
         handle_amend_visit,
         schema=SERVICE_AMEND_VISIT_SCHEMA,
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOG_DRINK,
+        handle_log_drink,
+        schema=SERVICE_LOG_DRINK_SCHEMA,
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOG_MEAL,
+        handle_log_meal,
+        schema=SERVICE_LOG_MEAL_SCHEMA,
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOG_THIRST,
+        handle_log_thirst,
+        schema=SERVICE_LOG_THIRST_SCHEMA,
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOG_APPETITE,
+        handle_log_appetite,
+        schema=SERVICE_LOG_APPETITE_SCHEMA,
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOG_WELLBEING,
+        handle_log_wellbeing,
+        schema=SERVICE_LOG_WELLBEING_SCHEMA,
         supports_response=True,
     )
 
