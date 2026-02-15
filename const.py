@@ -34,6 +34,7 @@ SERVICE_LOG_MEDICATION = "log_medication"
 SERVICE_CONFIRM_VISIT = "confirm_visit"
 SERVICE_REASSIGN_VISIT = "reassign_visit"
 SERVICE_DELETE_VISIT = "delete_visit"
+SERVICE_AMEND_VISIT = "amend_visit"
 
 # Service attributes
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"

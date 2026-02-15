@@ -218,6 +218,40 @@
           "description": "The ID of the visit to delete (found in sensor attributes or logs)"
         }
       }
+    },
+    "amend_visit": {
+      "name": "Amend visit",
+      "description": "Update the details of an existing visit (pee, poop, consistency, etc.)",
+      "fields": {
+        "visit_id": {
+          "name": "Visit ID",
+          "description": "The ID of the visit to amend"
+        },
+        "did_pee": {
+          "name": "Did pee",
+          "description": "Update whether the pet urinated"
+        },
+        "did_poop": {
+          "name": "Did poop",
+          "description": "Update whether the pet defecated"
+        },
+        "poop_consistencies": {
+          "name": "Poop consistency",
+          "description": "Update consistency of the poop (can select multiple)"
+        },
+        "poop_color": {
+          "name": "Poop color",
+          "description": "Update color of the poop"
+        },
+        "urine_amount": {
+          "name": "Urine amount",
+          "description": "Update amount of urine"
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Update notes about this visit"
+        }
+      }
     }
   }
 }

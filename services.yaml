@@ -162,3 +162,81 @@ delete_visit:
       required: true
       selector:
         text:
+
+amend_visit:
+  name: Amend visit
+  description: Update the details of an existing visit (pee, poop, consistency, etc.)
+  fields:
+    visit_id:
+      name: Visit ID
+      description: The ID of the visit to amend
+      required: true
+      selector:
+        text:
+    did_pee:
+      name: Did pee
+      description: Update whether the pet urinated
+      selector:
+        boolean:
+    did_poop:
+      name: Did poop
+      description: Update whether the pet defecated
+      selector:
+        boolean:
+    poop_consistencies:
+      name: Poop consistency
+      description: Update consistency of the poop (can select multiple)
+      selector:
+        select:
+          options:
+            - label: Normal
+              value: normal
+            - label: Soft
+              value: soft
+            - label: Liquid
+              value: liquid
+            - label: Hard
+              value: hard
+            - label: Dry
+              value: dry
+          multiple: true
+    poop_color:
+      name: Poop color
+      description: Update color of the poop
+      selector:
+        select:
+          options:
+            - label: Brown
+              value: brown
+            - label: Dark brown
+              value: dark_brown
+            - label: Light brown
+              value: light_brown
+            - label: Yellow
+              value: yellow
+            - label: Green
+              value: green
+            - label: Red
+              value: red
+            - label: Black
+              value: black
+            - label: White
+              value: white
+    urine_amount:
+      name: Urine amount
+      description: Update amount of urine
+      selector:
+        select:
+          options:
+            - label: Small
+              value: small
+            - label: Normal
+              value: normal
+            - label: Large
+              value: large
+    notes:
+      name: Notes
+      description: Update notes about this visit
+      selector:
+        text:
+          multiline: true

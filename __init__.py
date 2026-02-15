@@ -8,7 +8,7 @@ import logging
 import voluptuous as vol
 
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.util import dt as dt_util
@@ -38,6 +38,7 @@ from .const import (
     CONF_PET_NAME,
     CONF_PET_TYPE,
     DOMAIN,
+    SERVICE_AMEND_VISIT,
     SERVICE_CONFIRM_VISIT,
     SERVICE_DELETE_VISIT,
     SERVICE_LOG_BATHROOM_VISIT,
@@ -106,6 +107,21 @@ SERVICE_DELETE_VISIT_SCHEMA = vol.Schema(
     }
 )
 
+# Schema for amend_visit service
+SERVICE_AMEND_VISIT_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_VISIT_ID): cv.string,
+        vol.Optional(ATTR_DID_PEE): cv.boolean,
+        vol.Optional(ATTR_DID_POOP): cv.boolean,
+        vol.Optional(ATTR_POOP_CONSISTENCIES): vol.All(
+            cv.ensure_list, [vol.In([c.value for c in PoopConsistency])]
+        ),
+        vol.Optional(ATTR_POOP_COLOR): vol.In([c.value for c in PoopColor]),
+        vol.Optional(ATTR_URINE_AMOUNT): vol.In([a.value for a in UrineAmount]),
+        vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Pet Health integration."""
@@ -114,7 +130,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     await store.async_load()
     hass.data[DOMAIN] = {"store": store}
 
-    async def handle_log_bathroom_visit(call: ServiceCall) -> None:
+    async def handle_log_bathroom_visit(call: ServiceCall) -> ServiceResponse:
         """Handle the log_bathroom_visit service call."""
         entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
         entry = hass.config_entries.async_get_entry(entry_id)
@@ -183,7 +199,13 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             visit.timestamp,
         )
 
-    async def handle_log_medication(call: ServiceCall) -> None:
+        return {
+            "visit_id": visit.visit_id,
+            "timestamp": visit.timestamp.isoformat(),
+            "pet_name": pet_data.name,
+        }
+
+    async def handle_log_medication(call: ServiceCall) -> ServiceResponse:
         """Handle the log_medication service call."""
         entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
         entry = hass.config_entries.async_get_entry(entry_id)
@@ -246,7 +268,14 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             medication.timestamp,
         )
 
-    async def handle_confirm_visit(call: ServiceCall) -> None:
+        return {
+            "medication_id": medication_id,
+            "medication_name": medication_config[CONF_MEDICATION_NAME],
+            "timestamp": medication.timestamp.isoformat(),
+            "pet_name": pet_data.name,
+        }
+
+    async def handle_confirm_visit(call: ServiceCall) -> ServiceResponse:
         """Handle the confirm_visit service call."""
         visit_id = call.data[ATTR_VISIT_ID]
 
@@ -255,10 +284,11 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
         if await store.async_update_visit(visit_id, confirm):
             _LOGGER.info("Confirmed visit %s", visit_id)
+            return {"visit_id": visit_id, "confirmed": True}
         else:
             raise HomeAssistantError(f"Visit {visit_id} not found")
 
-    async def handle_reassign_visit(call: ServiceCall) -> None:
+    async def handle_reassign_visit(call: ServiceCall) -> ServiceResponse:
         """Handle the reassign_visit service call."""
         visit_id = call.data[ATTR_VISIT_ID]
         new_entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
@@ -280,15 +310,46 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
         if await store.async_update_visit(visit_id, reassign):
             _LOGGER.info("Reassigned visit %s to %s", visit_id, new_pet_data.name)
+            return {
+                "visit_id": visit_id,
+                "new_pet_name": new_pet_data.name,
+                "confirmed": True,
+            }
         else:
             raise HomeAssistantError(f"Visit {visit_id} not found")
 
-    async def handle_delete_visit(call: ServiceCall) -> None:
+    async def handle_delete_visit(call: ServiceCall) -> ServiceResponse:
         """Handle the delete_visit service call."""
         visit_id = call.data[ATTR_VISIT_ID]
 
         if await store.async_delete_visit(visit_id):
             _LOGGER.info("Deleted visit %s", visit_id)
+            return {"visit_id": visit_id, "deleted": True}
+        else:
+            raise HomeAssistantError(f"Visit {visit_id} not found")
+
+    async def handle_amend_visit(call: ServiceCall) -> ServiceResponse:
+        """Handle the amend_visit service call."""
+        visit_id = call.data[ATTR_VISIT_ID]
+
+        def amend(visit: BathroomVisit) -> None:
+            # Update only the fields that were provided
+            if ATTR_DID_PEE in call.data:
+                visit.did_pee = call.data[ATTR_DID_PEE]
+            if ATTR_DID_POOP in call.data:
+                visit.did_poop = call.data[ATTR_DID_POOP]
+            if ATTR_POOP_CONSISTENCIES in call.data:
+                visit.poop_consistencies = call.data[ATTR_POOP_CONSISTENCIES]
+            if ATTR_POOP_COLOR in call.data:
+                visit.poop_color = call.data[ATTR_POOP_COLOR]
+            if ATTR_URINE_AMOUNT in call.data:
+                visit.urine_amount = call.data[ATTR_URINE_AMOUNT]
+            if ATTR_NOTES in call.data:
+                visit.notes = call.data[ATTR_NOTES]
+
+        if await store.async_update_visit(visit_id, amend):
+            _LOGGER.info("Amended visit %s", visit_id)
+            return {"visit_id": visit_id, "amended": True}
         else:
             raise HomeAssistantError(f"Visit {visit_id} not found")
 
@@ -298,6 +359,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         SERVICE_LOG_BATHROOM_VISIT,
         handle_log_bathroom_visit,
         schema=SERVICE_LOG_BATHROOM_VISIT_SCHEMA,
+        supports_response=True,
     )
 
     hass.services.async_register(
@@ -305,6 +367,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         SERVICE_LOG_MEDICATION,
         handle_log_medication,
         schema=SERVICE_LOG_MEDICATION_SCHEMA,
+        supports_response=True,
     )
 
     hass.services.async_register(
@@ -312,6 +375,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         SERVICE_CONFIRM_VISIT,
         handle_confirm_visit,
         schema=SERVICE_CONFIRM_VISIT_SCHEMA,
+        supports_response=True,
     )
 
     hass.services.async_register(
@@ -319,6 +383,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         SERVICE_REASSIGN_VISIT,
         handle_reassign_visit,
         schema=SERVICE_REASSIGN_VISIT_SCHEMA,
+        supports_response=True,
     )
 
     hass.services.async_register(
@@ -326,6 +391,15 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         SERVICE_DELETE_VISIT,
         handle_delete_visit,
         schema=SERVICE_DELETE_VISIT_SCHEMA,
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_AMEND_VISIT,
+        handle_amend_visit,
+        schema=SERVICE_AMEND_VISIT_SCHEMA,
+        supports_response=True,
     )
 
     return True
