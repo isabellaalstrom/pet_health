@@ -107,22 +107,24 @@ class PetHealthStore:
         # Apply the update
         update_fn(visit)
 
-        # Save to storage
+        # If pet was changed, move visit to new pet's list BEFORE saving
+        if visit.pet_id != old_pet_id:
+            self._visits_data[old_pet_id].remove(visit)
+            if visit.pet_id not in self._visits_data:
+                self._visits_data[visit.pet_id] = []
+            self._visits_data[visit.pet_id].append(visit)
+
+        # Save to storage (after move if needed)
         visits_dict = {
             pet_id: [visit.to_dict() for visit in visits]
             for pet_id, visits in self._visits_data.items()
         }
         await self._visits_store.async_save(visits_dict)
 
-        # Notify callbacks for old pet (to remove from old pet's sensors if reassigned)
+        # Notify callbacks for old pet
         self._notify_callbacks(old_pet_id)
         # If pet was changed, notify new pet too
         if visit.pet_id != old_pet_id:
-            # Move visit to new pet's list
-            self._visits_data[old_pet_id].remove(visit)
-            if visit.pet_id not in self._visits_data:
-                self._visits_data[visit.pet_id] = []
-            self._visits_data[visit.pet_id].append(visit)
             self._notify_callbacks(visit.pet_id)
 
         return True
