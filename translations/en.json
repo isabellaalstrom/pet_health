@@ -153,6 +153,10 @@
         "notes": {
           "name": "Notes",
           "description": "Additional notes about the visit"
+        },
+        "confirmed": {
+          "name": "Confirmed",
+          "description": "Whether this visit is confirmed. Set to false for AI/automated logs that need manual confirmation."
         }
       }
     },
@@ -170,11 +174,35 @@
         },
         "given_at": {
           "name": "Given at",
-          "description": "When the medication was given"
+          "description": "When the medication was given. Leave empty for current time, or click to select a past date/time"
         },
         "notes": {
           "name": "Notes",
           "description": "Additional notes about this dose"
+        }
+      }
+    },
+    "confirm_visit": {
+      "name": "Confirm visit",
+      "description": "Mark a bathroom visit as confirmed (typically used after AI/automated logging)",
+      "fields": {
+        "visit_id": {
+          "name": "Visit ID",
+          "description": "The ID of the visit to confirm (found in sensor attributes or logs)"
+        }
+      }
+    },
+    "reassign_visit": {
+      "name": "Reassign visit",
+      "description": "Change which pet a visit belongs to (automatically marks as confirmed)",
+      "fields": {
+        "visit_id": {
+          "name": "Visit ID",
+          "description": "The ID of the visit to reassign"
+        },
+        "config_entry_id": {
+          "name": "New pet",
+          "description": "The pet to reassign this visit to"
         }
       }
     }

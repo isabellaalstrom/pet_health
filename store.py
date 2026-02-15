@@ -87,6 +87,68 @@ class PetHealthStore:
         """Get all medications for a pet."""
         return self._medications_data.get(pet_id, [])
 
+    def find_visit(self, visit_id: str) -> tuple[str, BathroomVisit] | None:
+        """Find a visit by ID. Returns (pet_id, visit) or None."""
+        for pet_id, visits in self._visits_data.items():
+            for visit in visits:
+                if visit.visit_id == visit_id:
+                    return (pet_id, visit)
+        return None
+
+    async def async_update_visit(
+        self, visit_id: str, update_fn: Callable[[BathroomVisit], None]
+    ) -> bool:
+        """Update a visit by ID. Returns True if found and updated."""
+        result = self.find_visit(visit_id)
+        if not result:
+            return False
+
+        old_pet_id, visit = result
+        # Apply the update
+        update_fn(visit)
+
+        # Save to storage
+        visits_dict = {
+            pet_id: [visit.to_dict() for visit in visits]
+            for pet_id, visits in self._visits_data.items()
+        }
+        await self._visits_store.async_save(visits_dict)
+
+        # Notify callbacks for old pet (to remove from old pet's sensors if reassigned)
+        self._notify_callbacks(old_pet_id)
+        # If pet was changed, notify new pet too
+        if visit.pet_id != old_pet_id:
+            # Move visit to new pet's list
+            self._visits_data[old_pet_id].remove(visit)
+            if visit.pet_id not in self._visits_data:
+                self._visits_data[visit.pet_id] = []
+            self._visits_data[visit.pet_id].append(visit)
+            self._notify_callbacks(visit.pet_id)
+
+        return True
+
+    async def async_delete_visit(self, visit_id: str) -> bool:
+        """Delete a visit by ID. Returns True if found and deleted."""
+        result = self.find_visit(visit_id)
+        if not result:
+            return False
+
+        pet_id, visit = result
+        # Remove from list
+        self._visits_data[pet_id].remove(visit)
+
+        # Save to storage
+        visits_dict = {
+            pet_id: [visit.to_dict() for visit in visits]
+            for pet_id, visits in self._visits_data.items()
+        }
+        await self._visits_store.async_save(visits_dict)
+
+        # Notify callbacks
+        self._notify_callbacks(pet_id)
+
+        return True
+
     def register_update_callback(self, pet_id: str, callback: Callable) -> None:
         """Register a callback for when data is updated."""
         if pet_id not in self._callbacks:

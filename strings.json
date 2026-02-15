@@ -113,6 +113,9 @@
       "daily_poop_count": {
         "name": "Daily poop visits"
       },
+      "unconfirmed_visits_count": {
+        "name": "Unconfirmed bathroom visits"
+      },
       "last_medication_dose": {
         "name": "Medication {medication_name} last dose"
       },
@@ -153,6 +156,10 @@
         "notes": {
           "name": "Notes",
           "description": "Additional notes about the visit"
+        },
+        "confirmed": {
+          "name": "Confirmed",
+          "description": "Whether this visit is confirmed. Set to false for AI/automated logs that need manual confirmation."
         }
       }
     },
@@ -175,6 +182,40 @@
         "notes": {
           "name": "Notes",
           "description": "Additional notes about this dose"
+        }
+      }
+    },
+    "confirm_visit": {
+      "name": "Confirm visit",
+      "description": "Mark a bathroom visit as confirmed (typically used after AI/automated logging)",
+      "fields": {
+        "visit_id": {
+          "name": "Visit ID",
+          "description": "The ID of the visit to confirm (found in sensor attributes or logs)"
+        }
+      }
+    },
+    "reassign_visit": {
+      "name": "Reassign visit",
+      "description": "Change which pet a visit belongs to (automatically marks as confirmed)",
+      "fields": {
+        "visit_id": {
+          "name": "Visit ID",
+          "description": "The ID of the visit to reassign"
+        },
+        "config_entry_id": {
+          "name": "New pet",
+          "description": "The pet to reassign this visit to"
+        }
+      }
+    },
+    "delete_visit": {
+      "name": "Delete visit",
+      "description": "Delete a bathroom visit (use for false positives from AI detection)",
+      "fields": {
+        "visit_id": {
+          "name": "Visit ID",
+          "description": "The ID of the visit to delete (found in sensor attributes or logs)"
         }
       }
     }

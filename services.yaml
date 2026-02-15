@@ -84,6 +84,13 @@ log_bathroom_visit:
       selector:
         text:
           multiline: true
+    confirmed:
+      name: Confirmed
+      description: Whether this visit is confirmed. Set to false for AI/automated logs that need manual confirmation.
+      required: false
+      default: true
+      selector:
+        boolean:
 
 log_medication:
   name: Log medication
@@ -115,3 +122,43 @@ log_medication:
       selector:
         text:
           multiline: true
+
+confirm_visit:
+  name: Confirm visit
+  description: Mark a bathroom visit as confirmed (typically used after AI/automated logging)
+  fields:
+    visit_id:
+      name: Visit ID
+      description: The ID of the visit to confirm (found in sensor attributes or logs)
+      required: true
+      selector:
+        text:
+
+reassign_visit:
+  name: Reassign visit
+  description: Change which pet a visit belongs to (automatically marks as confirmed)
+  fields:
+    visit_id:
+      name: Visit ID
+      description: The ID of the visit to reassign
+      required: true
+      selector:
+        text:
+    config_entry_id:
+      name: New pet
+      description: The pet to reassign this visit to
+      required: true
+      selector:
+        config_entry:
+          integration: pet_health
+
+delete_visit:
+  name: Delete visit
+  description: Delete a bathroom visit (use for false positives from AI detection)
+  fields:
+    visit_id:
+      name: Visit ID
+      description: The ID of the visit to delete (found in sensor attributes or logs)
+      required: true
+      selector:
+        text:

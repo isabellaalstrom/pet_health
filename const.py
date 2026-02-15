@@ -31,6 +31,9 @@ STORAGE_KEY_MEDICATIONS = "pet_health_medications"
 # Service names
 SERVICE_LOG_BATHROOM_VISIT = "log_bathroom_visit"
 SERVICE_LOG_MEDICATION = "log_medication"
+SERVICE_CONFIRM_VISIT = "confirm_visit"
+SERVICE_REASSIGN_VISIT = "reassign_visit"
+SERVICE_DELETE_VISIT = "delete_visit"
 
 # Service attributes
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
@@ -40,6 +43,8 @@ ATTR_POOP_CONSISTENCIES = "poop_consistencies"
 ATTR_POOP_COLOR = "poop_color"
 ATTR_URINE_AMOUNT = "urine_amount"
 ATTR_NOTES = "notes"
+ATTR_CONFIRMED = "confirmed"
+ATTR_VISIT_ID = "visit_id"
 
 # Medication service attributes
 ATTR_MEDICATION_ID = "medication_id"

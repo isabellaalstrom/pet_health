@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -37,6 +38,8 @@ class BathroomVisit:
     pet_id: str
     did_pee: bool
     did_poop: bool
+    visit_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    confirmed: bool = True  # True for manual logs, False for AI logs
     poop_consistencies: list[PoopConsistency] = field(default_factory=list)
     poop_color: PoopColor | None = None
     urine_amount: UrineAmount | None = None
@@ -45,10 +48,12 @@ class BathroomVisit:
     def to_dict(self) -> dict:
         """Convert to dictionary for storage."""
         return {
+            "visit_id": self.visit_id,
             "timestamp": self.timestamp.isoformat(),
             "pet_id": self.pet_id,
             "did_pee": self.did_pee,
             "did_poop": self.did_poop,
+            "confirmed": self.confirmed,
             "poop_consistencies": self.poop_consistencies,
             "poop_color": self.poop_color,
             "urine_amount": self.urine_amount,
@@ -72,6 +77,10 @@ class BathroomVisit:
             pet_id=data["pet_id"],
             did_pee=did_pee,
             did_poop=did_poop,
+            visit_id=data.get(
+                "visit_id", str(uuid.uuid4())
+            ),  # Generate if missing (old data)
+            confirmed=data.get("confirmed", True),  # Default True for old data
             poop_consistencies=[
                 PoopConsistency(c) for c in data.get("poop_consistencies", [])
             ],

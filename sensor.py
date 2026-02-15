@@ -38,6 +38,7 @@ async def async_setup_entry(
         LastUrineAmountSensor(entry, store, pet_data.pet_id),
         DailyPeeCountSensor(entry, store, pet_data.pet_id),
         DailyPoopCountSensor(entry, store, pet_data.pet_id),
+        UnconfirmedVisitsCountSensor(entry, store, pet_data.pet_id),
     ]
 
     # Add medication sensors for each configured medication
@@ -173,7 +174,11 @@ class LastVisitTimestampSensor(PetHealthSensorBase):
             if timestamp.tzinfo is None:
                 timestamp = dt_util.as_utc(timestamp)
             self._attr_native_value = timestamp
+            # Merge with base attributes (pet, integration)
             self._attr_extra_state_attributes = {
+                **self._attr_extra_state_attributes,  # Base attributes (pet, integration)
+                "visit_id": last_visit.visit_id,
+                "confirmed": last_visit.confirmed,
                 "did_pee": last_visit.did_pee,
                 "did_poop": last_visit.did_poop,
                 "poop_consistencies": last_visit.poop_consistencies,
@@ -183,7 +188,11 @@ class LastVisitTimestampSensor(PetHealthSensorBase):
             }
         else:
             self._attr_native_value = None
-            self._attr_extra_state_attributes = {}
+            # Keep base attributes even when no visits
+            self._attr_extra_state_attributes = {
+                "pet": self._pet_data.name,
+                "integration": DOMAIN,
+            }
 
 
 class DailyVisitCountSensor(PetHealthSensorBase):
@@ -398,6 +407,51 @@ class DailyPoopCountSensor(PetHealthSensorBase):
         visits_today = self._get_visits_since(today_start)
         poop_visits = [v for v in visits_today if v.did_poop]
         self._attr_native_value = len(poop_visits)
+
+
+class UnconfirmedVisitsCountSensor(PetHealthSensorBase):
+    """Sensor counting unconfirmed bathroom visits."""
+
+    _attr_translation_key = "unconfirmed_visits_count"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = "visits"
+    _attr_icon = "mdi:alert-circle"
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_unconfirmed_visits_count"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        visits = self._get_visits()
+        unconfirmed_visits = [v for v in visits if not v.confirmed]
+        self._attr_native_value = len(unconfirmed_visits)
+
+        # Add list of unconfirmed visits with details to attributes
+        visits_list = []
+        for visit in unconfirmed_visits:
+            visit_info = {
+                "visit_id": visit.visit_id,
+                "timestamp": visit.timestamp.isoformat(),
+                "did_pee": visit.did_pee,
+                "did_poop": visit.did_poop,
+            }
+            if visit.poop_consistencies:
+                visit_info["poop_consistencies"] = visit.poop_consistencies
+            if visit.poop_color:
+                visit_info["poop_color"] = visit.poop_color
+            if visit.urine_amount:
+                visit_info["urine_amount"] = visit.urine_amount
+            if visit.notes:
+                visit_info["notes"] = visit.notes
+            visits_list.append(visit_info)
+
+        # Sort by timestamp (oldest first)
+        visits_list.sort(key=lambda x: x["timestamp"])
+        self._attr_extra_state_attributes["unconfirmed_visits"] = visits_list
 
 
 class LastMedicationDoseSensor(PetHealthSensorBase):

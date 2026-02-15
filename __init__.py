@@ -15,6 +15,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     ATTR_CONFIG_ENTRY_ID,
+    ATTR_CONFIRMED,
     ATTR_DID_PEE,
     ATTR_DID_POOP,
     ATTR_DOSAGE,
@@ -27,6 +28,7 @@ from .const import (
     ATTR_REASON,
     ATTR_UNIT,
     ATTR_URINE_AMOUNT,
+    ATTR_VISIT_ID,
     CONF_MEDICATION_DOSAGE,
     CONF_MEDICATION_ID,
     CONF_MEDICATION_NAME,
@@ -36,8 +38,11 @@ from .const import (
     CONF_PET_NAME,
     CONF_PET_TYPE,
     DOMAIN,
+    SERVICE_CONFIRM_VISIT,
+    SERVICE_DELETE_VISIT,
     SERVICE_LOG_BATHROOM_VISIT,
     SERVICE_LOG_MEDICATION,
+    SERVICE_REASSIGN_VISIT,
     PetType,
     PoopColor,
     PoopConsistency,
@@ -57,6 +62,9 @@ SERVICE_LOG_BATHROOM_VISIT_SCHEMA = vol.Schema(
         vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
         vol.Optional(ATTR_DID_PEE, default=False): cv.boolean,
         vol.Optional(ATTR_DID_POOP, default=False): cv.boolean,
+        vol.Optional(
+            ATTR_CONFIRMED, default=True
+        ): cv.boolean,  # Default True for manual logs
         vol.Optional(ATTR_POOP_CONSISTENCIES): vol.All(
             cv.ensure_list, [vol.In([c.value for c in PoopConsistency])]
         ),
@@ -73,6 +81,28 @@ SERVICE_LOG_MEDICATION_SCHEMA = vol.Schema(
         vol.Required(ATTR_MEDICATION_ID): cv.string,
         vol.Optional(ATTR_GIVEN_AT): cv.datetime,
         vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
+# Schema for confirm_visit service
+SERVICE_CONFIRM_VISIT_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_VISIT_ID): cv.string,
+    }
+)
+
+# Schema for reassign_visit service
+SERVICE_REASSIGN_VISIT_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_VISIT_ID): cv.string,
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,  # New pet
+    }
+)
+
+# Schema for delete_visit service
+SERVICE_DELETE_VISIT_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_VISIT_ID): cv.string,
     }
 )
 
@@ -130,6 +160,9 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             pet_id=pet_data.pet_id,
             did_pee=did_pee,
             did_poop=did_poop,
+            confirmed=call.data.get(
+                ATTR_CONFIRMED, True
+            ),  # True for manual, False for AI
             poop_consistencies=poop_consistencies,
             poop_color=poop_color,
             urine_amount=urine_amount,
@@ -213,6 +246,52 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             medication.timestamp,
         )
 
+    async def handle_confirm_visit(call: ServiceCall) -> None:
+        """Handle the confirm_visit service call."""
+        visit_id = call.data[ATTR_VISIT_ID]
+
+        def confirm(visit: BathroomVisit) -> None:
+            visit.confirmed = True
+
+        if await store.async_update_visit(visit_id, confirm):
+            _LOGGER.info("Confirmed visit %s", visit_id)
+        else:
+            raise HomeAssistantError(f"Visit {visit_id} not found")
+
+    async def handle_reassign_visit(call: ServiceCall) -> None:
+        """Handle the reassign_visit service call."""
+        visit_id = call.data[ATTR_VISIT_ID]
+        new_entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
+        new_entry = hass.config_entries.async_get_entry(new_entry_id)
+
+        if not new_entry:
+            raise HomeAssistantError(f"Config entry {new_entry_id} not found")
+
+        if new_entry.domain != DOMAIN:
+            raise HomeAssistantError(
+                f"Config entry {new_entry_id} is not a pet_health entry"
+            )
+
+        new_pet_data: PetData = new_entry.runtime_data
+
+        def reassign(visit: BathroomVisit) -> None:
+            visit.pet_id = new_pet_data.pet_id
+            visit.confirmed = True  # Auto-confirm when manually reassigned
+
+        if await store.async_update_visit(visit_id, reassign):
+            _LOGGER.info("Reassigned visit %s to %s", visit_id, new_pet_data.name)
+        else:
+            raise HomeAssistantError(f"Visit {visit_id} not found")
+
+    async def handle_delete_visit(call: ServiceCall) -> None:
+        """Handle the delete_visit service call."""
+        visit_id = call.data[ATTR_VISIT_ID]
+
+        if await store.async_delete_visit(visit_id):
+            _LOGGER.info("Deleted visit %s", visit_id)
+        else:
+            raise HomeAssistantError(f"Visit {visit_id} not found")
+
     # Register services
     hass.services.async_register(
         DOMAIN,
@@ -226,6 +305,27 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         SERVICE_LOG_MEDICATION,
         handle_log_medication,
         schema=SERVICE_LOG_MEDICATION_SCHEMA,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CONFIRM_VISIT,
+        handle_confirm_visit,
+        schema=SERVICE_CONFIRM_VISIT_SCHEMA,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_REASSIGN_VISIT,
+        handle_reassign_visit,
+        schema=SERVICE_REASSIGN_VISIT_SCHEMA,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_DELETE_VISIT,
+        handle_delete_visit,
+        schema=SERVICE_DELETE_VISIT_SCHEMA,
     )
 
     return True
