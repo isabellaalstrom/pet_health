@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime
 import logging
+import os
 
 import voluptuous as vol
 
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
 from homeassistant.exceptions import HomeAssistantError
@@ -82,6 +84,7 @@ from .models import (
     WellbeingRecord,
 )
 from .store import PetHealthStore
+from . import panel
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -244,6 +247,15 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     store = PetHealthStore(hass)
     await store.async_load()
     hass.data[DOMAIN] = {"store": store}
+
+    # Register the www directory for serving panel assets
+    www_dir = os.path.join(os.path.dirname(__file__), "www")
+    await hass.http.async_register_static_paths(
+        [StaticPathConfig("/pet_health_panel", www_dir, cache_headers=False)]
+    )
+
+    # Register the frontend panel
+    await panel.async_register_panel(hass)
 
     async def handle_log_bathroom_visit(call: ServiceCall) -> ServiceResponse:
         """Handle the log_bathroom_visit service call."""
