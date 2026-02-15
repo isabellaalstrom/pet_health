@@ -1,0 +1,102 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a pet",
+        "description": "Select the type of pet you want to add.",
+        "data": {
+          "pet_type": "Pet type"
+        }
+      },
+      "name": {
+        "title": "Name your pet",
+        "description": "Enter a name for your pet.",
+        "data": {
+          "pet_name": "Pet name"
+        }
+      }
+    },
+    "error": {
+      "empty_name": "Pet name cannot be empty."
+    },
+    "abort": {
+      "already_configured": "A pet with this name already exists."
+    }
+  },
+  "selector": {
+    "pet_type": {
+      "options": {
+        "cat": "Cat",
+        "dog": "Dog",
+        "other": "Other"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "last_litter_box_visit": {
+        "name": "Last litter box visit"
+      },
+      "daily_visit_count": {
+        "name": "Daily litter box visits"
+      },
+      "weekly_visit_count": {
+        "name": "Weekly litter box visits"
+      },
+      "hours_since_last_visit": {
+        "name": "Hours since last litter box visit"
+      },
+      "last_poop_consistency": {
+        "name": "Last poop consistency"
+      },
+      "last_poop_color": {
+        "name": "Last poop color"
+      },
+      "last_urine_amount": {
+        "name": "Last urine amount"
+      },
+      "daily_pee_count": {
+        "name": "Daily pee visits"
+      },
+      "daily_poop_count": {
+        "name": "Daily poop visits"
+      }
+    }
+  },
+  "services": {
+    "log_litter_box_visit": {
+      "name": "Log litter box visit",
+      "description": "Record a litter box visit for a pet",
+      "fields": {
+        "config_entry_id": {
+          "name": "Pet",
+          "description": "The pet that used the litter box"
+        },
+        "did_pee": {
+          "name": "Did pee",
+          "description": "Check if the pet urinated"
+        },
+        "did_poop": {
+          "name": "Did poop",
+          "description": "Check if the pet defecated"
+        },
+        "poop_consistencies": {
+          "name": "Poop consistencies",
+          "description": "The consistency of the poop - enter them in chronological order (e.g., normal, then diarrhea)"
+        },
+        "poop_color": {
+          "name": "Poop color",
+          "description": "The color of the poop"
+        },
+        "urine_amount": {
+          "name": "Urine amount",
+          "description": "The amount of urine"
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Additional notes about the visit"
+        }
+      }
+    }
+  }
+}

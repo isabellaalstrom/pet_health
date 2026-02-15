@@ -1,0 +1,86 @@
+log_litter_box_visit:
+  name: Log litter box visit
+  description: Record a litter box visit for a pet
+  fields:
+    config_entry_id:
+      name: Pet
+      description: The pet that used the litter box
+      required: true
+      selector:
+        config_entry:
+          integration: pet_health
+    did_pee:
+      name: Did pee
+      description: Check if the pet urinated
+      required: false
+      default: false
+      selector:
+        boolean:
+    did_poop:
+      name: Did poop
+      description: Check if the pet defecated
+      required: false
+      default: false
+      selector:
+        boolean:
+    poop_consistencies:
+      name: Poop consistencies
+      description: The consistency of the poop (can select multiple for changes during the visit)
+      required: false
+      selector:
+        select:
+          multiple: true
+          options:
+            - label: Normal
+              value: normal
+            - label: Soft
+              value: soft
+            - label: Diarrhea
+              value: diarrhea
+            - label: Hard
+              value: hard
+            - label: Constipated
+              value: constipated
+    poop_color:
+      name: Poop color
+      description: The color of the poop
+      required: false
+      selector:
+        select:
+          options:
+            - label: Brown
+              value: brown
+            - label: Dark brown
+              value: dark_brown
+            - label: Light brown
+              value: light_brown
+            - label: Bloody
+              value: bloody
+            - label: Green
+              value: green
+            - label: Yellow
+              value: yellow
+            - label: Black
+              value: black
+            - label: Unusual
+              value: unusual
+    urine_amount:
+      name: Urine amount
+      description: The amount of urine
+      required: false
+      selector:
+        select:
+          options:
+            - label: Normal
+              value: normal
+            - label: More than usual
+              value: more_than_usual
+            - label: Less than usual
+              value: less_than_usual
+    notes:
+      name: Notes
+      description: Additional notes about the visit
+      required: false
+      selector:
+        text:
+          multiline: true

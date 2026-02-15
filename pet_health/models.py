@@ -1,0 +1,88 @@
+"""Data models for the Pet Health integration."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.device_registry import DeviceInfo
+
+from .const import DOMAIN, PetType, PoopColor, PoopConsistency, UrineAmount
+
+
+@dataclass
+class PetData:
+    """Data model for a pet."""
+
+    pet_id: str
+    name: str
+    pet_type: PetType
+
+    def device_info(self) -> DeviceInfo:
+        """Return device info for this pet."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.pet_id)},
+            name=self.name,
+            manufacturer="Pet Health",
+            model=self.pet_type.value.capitalize(),
+        )
+
+
+@dataclass
+class LitterBoxVisit:
+    """Data model for a litter box visit."""
+
+    timestamp: datetime
+    pet_id: str
+    did_pee: bool
+    did_poop: bool
+    poop_consistencies: list[PoopConsistency] = field(default_factory=list)
+    poop_color: PoopColor | None = None
+    urine_amount: UrineAmount | None = None
+    notes: str | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage."""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "pet_id": self.pet_id,
+            "did_pee": self.did_pee,
+            "did_poop": self.did_poop,
+            "poop_consistencies": self.poop_consistencies,
+            "poop_color": self.poop_color,
+            "urine_amount": self.urine_amount,
+            "notes": self.notes,
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> LitterBoxVisit:
+        """Create from dictionary."""
+        # Handle old format with visit_type (backwards compatibility)
+        if "visit_type" in data:
+            visit_type = data["visit_type"]
+            did_pee = visit_type in ("pee", "both")
+            did_poop = visit_type in ("poop", "both")
+        else:
+            did_pee = data.get("did_pee", False)
+            did_poop = data.get("did_poop", False)
+
+        return LitterBoxVisit(
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            pet_id=data["pet_id"],
+            did_pee=did_pee,
+            did_poop=did_poop,
+            poop_consistencies=[
+                PoopConsistency(c) for c in data.get("poop_consistencies", [])
+            ],
+            poop_color=PoopColor(data["poop_color"])
+            if data.get("poop_color")
+            else None,
+            urine_amount=(
+                UrineAmount(data["urine_amount"]) if data.get("urine_amount") else None
+            ),
+            notes=data.get("notes"),
+        )
+
+
+type PetHealthConfigEntry = ConfigEntry[PetData]
