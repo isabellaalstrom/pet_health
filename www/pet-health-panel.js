@@ -9,6 +9,11 @@ class PetHealthPanel extends HTMLElement {
     this.hass = null;
     this._currentView = 'dashboard';
     this._selectedPetId = null;
+    this._configEntries = [];
+    this._loadingEntries = false;
+    this._visits = [];
+    this._loadingVisits = false;
+    this._editingVisitId = null;
   }
 
   set hass(hass) {
@@ -16,7 +21,13 @@ class PetHealthPanel extends HTMLElement {
     if (!this.isConnected) {
       return;
     }
-    this.render();
+
+    // Load config entries if not already loaded
+    if (this._configEntries.length === 0 && !this._loadingEntries) {
+      this.loadConfigEntries();
+    } else {
+      this.render();
+    }
   }
 
   get hass() {
@@ -24,7 +35,40 @@ class PetHealthPanel extends HTMLElement {
   }
 
   connectedCallback() {
-    this.render();
+    if (this.hass) {
+      this.loadConfigEntries();
+    }
+  }
+
+  async loadConfigEntries() {
+    if (this._loadingEntries) return;
+    this._loadingEntries = true;
+
+    try {
+      // Use the integration's websocket command so we get the internal pet_id
+      const result = await this.hass.callWS({
+        type: 'pet_health/get_pet_data',
+      });
+
+      this._configEntries = result.entries || [];
+
+      // Debug: Log config entry structure
+      console.log('Config entries loaded:', this._configEntries.length);
+      if (this._configEntries.length > 0) {
+        console.log('First entry structure:', JSON.stringify(this._configEntries[0], null, 2));
+      }
+
+      // Select first pet if none selected
+      if (!this._selectedPetId && this._configEntries.length > 0) {
+        this._selectedPetId = this._configEntries[0].entry_id;
+      }
+    } catch (err) {
+      console.error('Failed to load pet config entries:', err);
+      this._configEntries = [];
+    } finally {
+      this._loadingEntries = false;
+      this.render();
+    }
   }
 
   render() {
@@ -32,9 +76,33 @@ class PetHealthPanel extends HTMLElement {
       return;
     }
 
+    // Show loading state while fetching config entries
+    if (this._loadingEntries) {
+      this.innerHTML = `
+        <style>
+          :host {
+            display: block;
+            height: 100%;
+            background: var(--primary-background-color);
+            overflow: auto;
+          }
+          .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-size: 18px;
+            color: var(--primary-text-color);
+          }
+        </style>
+        <div class="loading">Loading pets...</div>
+      `;
+      return;
+    }
+
     // Get pet config entries
     const pets = this.getPets();
-    
+
     // If no pet selected, select the first one
     if (!this._selectedPetId && pets.length > 0) {
       this._selectedPetId = pets[0].entry_id;
@@ -202,7 +270,7 @@ class PetHealthPanel extends HTMLElement {
       <div class="pet-health-container">
         <div class="header">
           <h1>🐾 Pet Health Dashboard</h1>
-          
+
           ${pets.length === 0 ? `
             <div class="empty-state">
               <p>No pets configured yet. Add a pet in the Home Assistant integration settings.</p>
@@ -246,6 +314,11 @@ class PetHealthPanel extends HTMLElement {
     const pet = this.getSelectedPet();
     if (!pet) return '<div class="empty-state">Pet not found</div>';
 
+    // Load visits when switching to visits view
+    if (this._currentView === 'visits' && this._visits.length === 0 && !this._loadingVisits) {
+      this.loadVisits();
+    }
+
     switch (this._currentView) {
       case 'dashboard':
         return this.renderDashboard(pet);
@@ -262,28 +335,19 @@ class PetHealthPanel extends HTMLElement {
 
   renderDashboard(pet) {
     const sensors = this.getPetSensors(pet.entry_id);
-    
+
+    // Debug: log available sensors
+    console.log('Pet:', pet.name, 'Sensors found:', Object.keys(sensors));
+
     return `
       <div class="content-area">
         <h2>Overview for ${pet.name}</h2>
-        
+
         <div class="stats-grid">
           ${this.renderStat('Last Bathroom Visit', sensors.last_bathroom_visit)}
-          ${this.renderStat('Daily Visits', sensors.daily_visit_count)}
-          ${this.renderStat('Hours Since Last Visit', sensors.hours_since_last_visit)}
-          ${this.renderStat('Unconfirmed Visits', sensors.unconfirmed_visits_count, 'warning')}
-        </div>
-
-        <div class="action-section">
-          <h2>Quick Actions</h2>
-          <div class="action-buttons">
-            <button class="action-button" data-action="log-bathroom">
-              🚽 Log Bathroom Visit
-            </button>
-            <button class="action-button" data-action="log-medication">
-              💊 Log Medication
-            </button>
-            <button class="action-button" data-action="log-meal">
+          ${this.renderStat('Daily Visits', sensors.daily_bathroom_visits)}
+          ${this.renderStat('Hours Since Last Visit', sensors.hours_since_last_bathroom_visit)}
+          ${this.renderStat('Unconfirmed Visits', sensors.unconfirmed_bathroom_visits, 'warning')}
               🍽️ Log Meal
             </button>
             <button class="action-button" data-action="log-weight">
@@ -296,12 +360,155 @@ class PetHealthPanel extends HTMLElement {
   }
 
   renderVisits(pet) {
+    if (this._loadingVisits) {
+      return `
+        <div class="content-area">
+          <h2>Bathroom Visit History</h2>
+          <p>Loading visits...</p>
+        </div>
+      `;
+    }
+
+    // Filter visits for this pet
+    const petInternalId = this.getPetIdFromEntry(pet.entry_id);
+    console.log('Filtering visits for pet:', pet.name);
+    console.log('Pet entry_id:', pet.entry_id);
+    console.log('Pet internal pet_id:', petInternalId);
+    console.log('Total visits loaded:', this._visits.length);
+    console.log('All visit pet_ids:', this._visits.map(v => v.pet_id));
+
+    const petVisits = this._visits.filter(v => v.pet_id === pet.entry_id || v.pet_id === petInternalId);
+    console.log('Filtered visits for this pet:', petVisits.length);
+
+    const unconfirmedVisits = petVisits.filter(v => !v.confirmed);
+    const confirmedVisits = petVisits.filter(v => v.confirmed).slice(0, 20); // Show last 20
+
+    console.log('Unconfirmed:', unconfirmedVisits.length, 'Confirmed:', confirmedVisits.length);
+
     return `
       <div class="content-area">
-        <h2>Bathroom Visit History</h2>
-        <p>Coming soon: Detailed visit history and management</p>
+        <h2>Bathroom Visit History for ${pet.name}</h2>
+
+        ${unconfirmedVisits.length > 0 ? `
+          <div style="margin-bottom: 32px;">
+            <h3 style="color: #ff9800; margin-bottom: 16px;">⚠️ Unconfirmed Visits (${unconfirmedVisits.length})</h3>
+            ${this.renderVisitsTable(unconfirmedVisits, true)}
+          </div>
+        ` : ''}
+
+        <div>
+          <h3 style="margin-bottom: 16px;">✅ Recent Visits</h3>
+          ${confirmedVisits.length > 0 ?
+            this.renderVisitsTable(confirmedVisits, false) :
+            '<p style="color: var(--secondary-text-color);">No confirmed visits yet</p>'}
+        </div>
       </div>
     `;
+  }
+
+  renderVisitsTable(visits, showActions) {
+    const allPets = this.getPets();
+
+    return `
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; background: var(--card-background-color);">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--divider-color);">
+              <th style="padding: 12px; text-align: left;">Time</th>
+              <th style="padding: 12px; text-align: center;">Pee</th>
+              <th style="padding: 12px; text-align: center;">Poop</th>
+              <th style="padding: 12px; text-align: left;">Details</th>
+              <th style="padding: 12px; text-align: left;">Notes</th>
+              ${showActions ? '<th style="padding: 12px; text-align: center;">Actions</th>' : ''}
+            </tr>
+          </thead>
+          <tbody>
+            ${visits.map(visit => this.renderVisitRow(visit, showActions, allPets)).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  renderVisitRow(visit, showActions, allPets) {
+    const timestamp = new Date(visit.timestamp);
+    const timeStr = timestamp.toLocaleString();
+    const isEditing = this._editingVisitId === visit.visit_id;
+
+    const poopDetails = [];
+    if (visit.poop_consistencies && visit.poop_consistencies.length > 0) {
+      poopDetails.push(`Consistency: ${visit.poop_consistencies.join(', ')}`);
+    }
+    if (visit.poop_color) {
+      poopDetails.push(`Color: ${visit.poop_color}`);
+    }
+
+    const urineDetails = [];
+    if (visit.urine_amount) {
+      urineDetails.push(`Amount: ${visit.urine_amount}`);
+    }
+
+    const details = [...poopDetails, ...urineDetails].join('; ');
+
+    return `
+      <tr style="border-bottom: 1px solid var(--divider-color);">
+        <td style="padding: 12px; white-space: nowrap;">${timeStr}</td>
+        <td style="padding: 12px; text-align: center;">${visit.did_pee ? '✓' : '−'}</td>
+        <td style="padding: 12px; text-align: center;">${visit.did_poop ? '✓' : '−'}</td>
+        <td style="padding: 12px; font-size: 14px; color: var(--secondary-text-color);">${details || '−'}</td>
+        <td style="padding: 12px; font-size: 14px; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${visit.notes || '−'}</td>
+        ${showActions ? `
+          <td style="padding: 12px;">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+              <button class="visit-action-btn" data-action="confirm" data-visit-id="${visit.visit_id}"
+                style="padding: 6px 12px; border: none; border-radius: 4px; background: #4caf50; color: white; cursor: pointer; font-size: 12px;">
+                ✓ Confirm
+              </button>
+              <button class="visit-action-btn" data-action="amend" data-visit-id="${visit.visit_id}"
+                style="padding: 6px 12px; border: none; border-radius: 4px; background: #2196f3; color: white; cursor: pointer; font-size: 12px;">
+                ✏️ Amend
+              </button>
+              <button class="visit-action-btn" data-action="reassign" data-visit-id="${visit.visit_id}"
+                style="padding: 6px 12px; border: none; border-radius: 4px; background: #ff9800; color: white; cursor: pointer; font-size: 12px;">
+                🔄 Reassign
+              </button>
+              <button class="visit-action-btn" data-action="delete" data-visit-id="${visit.visit_id}"
+                style="padding: 6px 12px; border: none; border-radius: 4px; background: #f44336; color: white; cursor: pointer; font-size: 12px;">
+                🗑️ Delete
+              </button>
+            </div>
+          </td>
+        ` : ''}
+      </tr>
+    `;
+  }
+
+  getPetIdFromEntry(entryId) {
+    const entry = this._configEntries.find((e) => e.entry_id === entryId);
+    // Entries may come from different sources: older shape uses entry.data.pet_id,
+    // newer websocket helper returns a flat object with pet_id at top-level.
+    return entry?.data?.pet_id ?? entry?.pet_id;
+  }
+
+  async loadVisits() {
+    if (this._loadingVisits) return;
+    this._loadingVisits = true;
+
+    try {
+      const result = await this.hass.callWS({
+        type: 'pet_health/get_visits'
+      });
+
+      this._visits = result.visits || [];
+      console.log('Loaded visits:', this._visits.length);
+
+    } catch (err) {
+      console.error('Failed to load visits:', err);
+      this._visits = [];
+    } finally {
+      this._loadingVisits = false;
+      this.render();
+    }
   }
 
   renderMedications(pet) {
@@ -325,26 +532,23 @@ class PetHealthPanel extends HTMLElement {
   renderStat(title, sensor, type = 'normal') {
     const value = sensor ? sensor.state : 'N/A';
     const borderColor = type === 'warning' && parseInt(value) > 0 ? '#ff9800' : 'var(--primary-color)';
-    
+
     return `
       <div class="stat-card" style="border-left-color: ${borderColor}">
         <h3>${title}</h3>
         <div class="stat-value">${value}</div>
-        ${sensor && sensor.attributes?.unit_of_measurement ? 
+        ${sensor && sensor.attributes?.unit_of_measurement ?
           `<div class="stat-subtext">${sensor.attributes.unit_of_measurement}</div>` : ''}
       </div>
     `;
   }
 
   getPets() {
-    const configEntries = this.hass?.config_entries || [];
-    return Object.values(configEntries)
-      .filter(entry => entry.domain === 'pet_health')
-      .map(entry => ({
-        entry_id: entry.entry_id,
-        name: entry.title,
-        type: entry.data?.pet_type || 'other'
-      }));
+    return this._configEntries.map(entry => ({
+      entry_id: entry.entry_id,
+      name: entry.title,
+      type: entry.data?.pet_type || 'other'
+    }));
   }
 
   getSelectedPet() {
@@ -364,21 +568,42 @@ class PetHealthPanel extends HTMLElement {
   getPetSensors(entryId) {
     const states = this.hass?.states || {};
     const sensors = {};
-    
-    // Find all sensors for this pet
+
+    // Get the pet name from the config entry
+    const configEntry = this._configEntries.find(e => e.entry_id === entryId);
+    if (!configEntry) {
+      console.warn('Could not find config entry:', entryId);
+      return sensors;
+    }
+
+    const petName = configEntry.title.toLowerCase().replace(/\s+/g, '_');
+
+    console.log('Looking for sensors for pet:', configEntry.title, 'entity prefix:', petName);
+
+    // Find all sensors for this pet by matching pet name in entity_id or pet attribute
     Object.keys(states).forEach(entityId => {
-      if (entityId.startsWith('sensor.') && states[entityId].attributes?.pet_id) {
+      if (entityId.startsWith('sensor.')) {
         const entity = states[entityId];
-        // Match sensors by comparing config entry id from entity attributes
-        // For now, we'll use a simpler approach - match by pet name in entity_id
-        const entryName = this.getSelectedPet()?.name?.toLowerCase().replace(/\s+/g, '_');
-        if (entityId.includes(entryName)) {
-          const key = entityId.split('.')[1].replace(`${entryName}_`, '');
+
+        // Check if this sensor belongs to our pet
+        const belongsToPet =
+          entityId.startsWith(`sensor.${petName}_`) ||
+          entity.attributes?.pet === configEntry.title;
+
+        if (belongsToPet) {
+          // Extract the sensor key by removing the pet name prefix
+          let key = entityId.split('.')[1];
+          if (key.startsWith(petName + '_')) {
+            key = key.substring(petName.length + 1);
+          }
+
           sensors[key] = entity;
+          console.log('Found sensor:', entityId, 'key:', key);
         }
       }
     });
-    
+    console.log('Finished scanning sensors for pet:', sensors);
+    console.log('Total sensors found:', Object.keys(sensors).length);
     return sensors;
   }
 
@@ -401,6 +626,15 @@ class PetHealthPanel extends HTMLElement {
     });
 
     // Action buttons
+
+    // Visit action buttons
+    this.querySelectorAll('.visit-action-btn').forEach(button => {
+      button.addEventListener('click', (e) => {
+        const action = e.target.dataset.action;
+        const visitId = e.target.dataset.visitId;
+        this.handleVisitAction(action, visitId);
+      });
+    });
     this.querySelectorAll('.action-button').forEach(button => {
       button.addEventListener('click', (e) => {
         this.handleAction(e.target.dataset.action);
@@ -440,6 +674,113 @@ class PetHealthPanel extends HTMLElement {
         }
         break;
     }
+  }
+
+  async handleVisitAction(action, visitId) {
+    const visit = this._visits.find(v => v.visit_id === visitId);
+    if (!visit) {
+      alert('Visit not found');
+      return;
+    }
+
+    try {
+      switch (action) {
+        case 'confirm':
+          await this.hass.callService('pet_health', 'confirm_visit', {
+            visit_id: visitId
+          });
+          alert('✅ Visit confirmed!');
+          await this.loadVisits();
+          break;
+
+        case 'reassign':
+          const pets = this.getPets();
+          const petOptions = pets.map((p, i) => `${i + 1}. ${p.name}`).join('\n');
+          const petChoice = prompt(`Reassign to which pet?\n${petOptions}\n\nEnter number:`);
+          if (petChoice) {
+            const selectedPet = pets[parseInt(petChoice) - 1];
+            if (selectedPet) {
+              await this.hass.callService('pet_health', 'reassign_visit', {
+                visit_id: visitId,
+                config_entry_id: selectedPet.entry_id
+              });
+              alert(`✅ Visit reassigned to ${selectedPet.name}!`);
+              await this.loadVisits();
+            }
+          }
+          break;
+
+        case 'amend':
+          this.showAmendDialog(visit);
+          break;
+
+        case 'delete':
+          if (confirm('Are you sure you want to delete this visit?')) {
+            await this.hass.callService('pet_health', 'delete_visit', {
+              visit_id: visitId
+            });
+            alert('✅ Visit deleted!');
+            await this.loadVisits();
+          }
+          break;
+      }
+    } catch (err) {
+      alert('❌ Error: ' + err.message);
+    }
+  }
+
+  showAmendDialog(visit) {
+    const didPee = prompt(`Did pee? Current: ${visit.did_pee ? 'Yes' : 'No'}\nEnter: yes/no`, visit.did_pee ? 'yes' : 'no');
+    const didPoop = prompt(`Did poop? Current: ${visit.did_poop ? 'Yes' : 'No'}\nEnter: yes/no`, visit.did_poop ? 'yes' : 'no');
+
+    let poopConsistencies = null;
+    let poopColor = null;
+    let urineAmount = null;
+
+    if (didPoop?.toLowerCase() === 'yes') {
+      const consistencyOptions = '1. Normal\n2. Soft\n3. Hard\n4. Diarrhea\n5. Liquid';
+      const consistency = prompt(`Poop consistency:\n${consistencyOptions}\n\nEnter number(s) separated by comma:`);
+      if (consistency) {
+        const map = ['normal', 'soft', 'hard', 'diarrhea', 'liquid'];
+        poopConsistencies = consistency.split(',').map(n => map[parseInt(n.trim()) - 1]).filter(Boolean);
+      }
+
+      const colorOptions = '1. Brown\n2. Dark\n3. Light\n4. Yellow\n5. Green\n6. Red\n7. Black';
+      const color = prompt(`Poop color:\n${colorOptions}\n\nEnter number:`);
+      if (color) {
+        const colorMap = ['brown', 'dark', 'light', 'yellow', 'green', 'red', 'black'];
+        poopColor = colorMap[parseInt(color) - 1];
+      }
+    }
+
+    if (didPee?.toLowerCase() === 'yes') {
+      const amountOptions = '1. Small\n2. Normal\n3. Large';
+      const amount = prompt(`Urine amount:\n${amountOptions}\n\nEnter number:`);
+      if (amount) {
+        const amountMap = ['small', 'normal', 'large'];
+        urineAmount = amountMap[parseInt(amount) - 1];
+      }
+    }
+
+    const notes = prompt('Notes (optional):', visit.notes || '');
+
+    const amendData = {
+      visit_id: visit.visit_id
+    };
+
+    if (didPee) amendData.did_pee = didPee.toLowerCase() === 'yes';
+    if (didPoop) amendData.did_poop = didPoop.toLowerCase() === 'yes';
+    if (poopConsistencies) amendData.poop_consistencies = poopConsistencies;
+    if (poopColor) amendData.poop_color = poopColor;
+    if (urineAmount) amendData.urine_amount = urineAmount;
+    if (notes !== null) amendData.notes = notes;
+
+    this.hass.callService('pet_health', 'amend_visit', amendData)
+      .then(() => {
+        alert('✅ Visit amended!');
+        return this.loadVisits();
+      })
+      .catch(err => alert('❌ Error: ' + err.message));
   }
 
   async callService(service, data) {

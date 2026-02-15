@@ -85,6 +85,7 @@ from .models import (
 )
 from .store import PetHealthStore
 from . import panel
+from . import websocket
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -256,6 +257,9 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
     # Register the frontend panel
     await panel.async_register_panel(hass)
+
+    # Register WebSocket API
+    websocket.async_register_websocket_api(hass)
 
     async def handle_log_bathroom_visit(call: ServiceCall) -> ServiceResponse:
         """Handle the log_bathroom_visit service call."""
