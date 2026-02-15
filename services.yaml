@@ -104,7 +104,7 @@ log_medication:
         text:
     given_at:
       name: Given at
-      description: When the medication was given (defaults to now)
+      description: When the medication was given. If not specified, uses current time. Click to adjust date/time for past doses.
       required: false
       selector:
         datetime:

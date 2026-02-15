@@ -179,9 +179,19 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             )
 
         # Use provided timestamp or current time
-        timestamp = call.data.get(ATTR_GIVEN_AT, dt_util.now())
-        if timestamp and not timestamp.tzinfo:
-            timestamp = dt_util.as_utc(timestamp)
+        given_at_raw = call.data.get(ATTR_GIVEN_AT)
+        _LOGGER.debug(
+            "Received given_at: %s (type: %s)", given_at_raw, type(given_at_raw)
+        )
+
+        if given_at_raw is None:
+            timestamp = dt_util.now()
+            _LOGGER.debug("No given_at provided, using current time: %s", timestamp)
+        else:
+            timestamp = given_at_raw
+            if not timestamp.tzinfo:
+                timestamp = dt_util.as_utc(timestamp)
+            _LOGGER.debug("Using provided timestamp: %s", timestamp)
 
         # Create medication record using configured medication info
         medication = MedicationRecord(

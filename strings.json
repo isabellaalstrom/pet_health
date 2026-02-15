@@ -170,7 +170,7 @@
         },
         "given_at": {
           "name": "Given at",
-          "description": "When the medication was given"
+          "description": "When the medication was given. Leave empty for current time, or click to select a past date/time"
         },
         "notes": {
           "name": "Notes",

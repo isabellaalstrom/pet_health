@@ -114,10 +114,10 @@
         "name": "Daily poop visits"
       },
       "last_medication_dose": {
-        "name": "Medication {medication_id} {medication_name} last dose"
+        "name": "Medication {medication_name} last dose"
       },
       "daily_medication_count": {
-        "name": "Medication {medication_id} {medication_name} doses today"
+        "name": "Medication {medication_name} doses today"
       }
     }
   },
