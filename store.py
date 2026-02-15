@@ -14,6 +14,8 @@ from .const import (
     STORAGE_KEY_MEDICATIONS,
     STORAGE_KEY_THIRST_LEVELS,
     STORAGE_KEY_VISITS,
+    STORAGE_KEY_VOMIT,
+    STORAGE_KEY_WEIGHT,
     STORAGE_KEY_WELLBEING,
     STORAGE_VERSION,
 )
@@ -24,6 +26,8 @@ from .models import (
     MealRecord,
     MedicationRecord,
     ThirstLevelRecord,
+    VomitRecord,
+    WeightRecord,
     WellbeingRecord,
 )
 
@@ -55,6 +59,12 @@ class PetHealthStore:
         self._wellbeing_store = Store[dict[str, list[dict]]](
             hass, STORAGE_VERSION, STORAGE_KEY_WELLBEING
         )
+        self._weight_store = Store[dict[str, list[dict]]](
+            hass, STORAGE_VERSION, STORAGE_KEY_WEIGHT
+        )
+        self._vomit_store = Store[dict[str, list[dict]]](
+            hass, STORAGE_VERSION, STORAGE_KEY_VOMIT
+        )
         self._visits_data: dict[str, list[BathroomVisit]] = {}
         self._medications_data: dict[str, list[MedicationRecord]] = {}
         self._drinks_data: dict[str, list[DrinkRecord]] = {}
@@ -62,6 +72,8 @@ class PetHealthStore:
         self._thirst_levels_data: dict[str, list[ThirstLevelRecord]] = {}
         self._appetite_levels_data: dict[str, list[AppetiteLevelRecord]] = {}
         self._wellbeing_data: dict[str, list[WellbeingRecord]] = {}
+        self._weight_data: dict[str, list[WeightRecord]] = {}
+        self._vomit_data: dict[str, list[VomitRecord]] = {}
         self._callbacks: dict[str, list[Callable]] = {}
 
     async def async_load(self) -> None:
@@ -122,6 +134,22 @@ class PetHealthStore:
             for pet_id, records in stored_wellbeing.items():
                 self._wellbeing_data[pet_id] = [
                     WellbeingRecord.from_dict(record) for record in records
+                ]
+
+        # Load weight records
+        stored_weight = await self._weight_store.async_load()
+        if stored_weight:
+            for pet_id, records in stored_weight.items():
+                self._weight_data[pet_id] = [
+                    WeightRecord.from_dict(record) for record in records
+                ]
+
+        # Load vomit records
+        stored_vomit = await self._vomit_store.async_load()
+        if stored_vomit:
+            for pet_id, records in stored_vomit.items():
+                self._vomit_data[pet_id] = [
+                    VomitRecord.from_dict(record) for record in records
                 ]
 
     async def async_save_visit(self, visit: BathroomVisit) -> None:
@@ -308,6 +336,38 @@ class PetHealthStore:
         # Notify callbacks to update sensors immediately
         self._notify_callbacks(record.pet_id)
 
+    async def async_save_weight(self, record: WeightRecord) -> None:
+        """Save a weight record."""
+        if record.pet_id not in self._weight_data:
+            self._weight_data[record.pet_id] = []
+        self._weight_data[record.pet_id].append(record)
+
+        # Convert to storable format
+        store_data = {
+            pet_id: [r.to_dict() for r in records]
+            for pet_id, records in self._weight_data.items()
+        }
+        await self._weight_store.async_save(store_data)
+
+        # Notify callbacks to update sensors immediately
+        self._notify_callbacks(record.pet_id)
+
+    async def async_save_vomit(self, record: VomitRecord) -> None:
+        """Save a vomit record."""
+        if record.pet_id not in self._vomit_data:
+            self._vomit_data[record.pet_id] = []
+        self._vomit_data[record.pet_id].append(record)
+
+        # Convert to storable format
+        store_data = {
+            pet_id: [r.to_dict() for r in records]
+            for pet_id, records in self._vomit_data.items()
+        }
+        await self._vomit_store.async_save(store_data)
+
+        # Notify callbacks to update sensors immediately
+        self._notify_callbacks(record.pet_id)
+
     def get_drink_records(self, pet_id: str) -> list[DrinkRecord]:
         """Get all drink records for a pet."""
         return self._drinks_data.get(pet_id, [])
@@ -328,21 +388,13 @@ class PetHealthStore:
         """Get all wellbeing records for a pet."""
         return self._wellbeing_data.get(pet_id, [])
 
-    def get_drink_records(self, pet_id: str) -> list[DrinkRecord]:
-        """Get all drink records for a pet."""
-        return self._drinks_data.get(pet_id, [])
+    def get_weight_records(self, pet_id: str) -> list[WeightRecord]:
+        """Get all weight records for a pet."""
+        return self._weight_data.get(pet_id, [])
 
-    def get_meal_records(self, pet_id: str) -> list[MealRecord]:
-        """Get all meal records for a pet."""
-        return self._meals_data.get(pet_id, [])
-
-    def get_thirst_level_records(self, pet_id: str) -> list[ThirstLevelRecord]:
-        """Get all thirst level records for a pet."""
-        return self._thirst_levels_data.get(pet_id, [])
-
-    def get_appetite_level_records(self, pet_id: str) -> list[AppetiteLevelRecord]:
-        """Get all appetite level records for a pet."""
-        return self._appetite_levels_data.get(pet_id, [])
+    def get_vomit_records(self, pet_id: str) -> list[VomitRecord]:
+        """Get all vomit records for a pet."""
+        return self._vomit_data.get(pet_id, [])
 
     def register_update_callback(self, pet_id: str, callback: Callable) -> None:
         """Register a callback for when data is updated."""

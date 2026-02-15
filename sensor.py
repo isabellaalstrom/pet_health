@@ -810,3 +810,375 @@ class CurrentWellbeingScoreSensor(PetHealthSensorBase):
             self._attr_native_value = last_record.wellbeing_score
         else:
             self._attr_native_value = None
+
+
+# Thirst Level Sensors (Symptoms/State)
+
+
+class LastThirstLevelTimestampSensor(PetHealthSensorBase):
+    """Sensor showing the timestamp of the last thirst level assessment."""
+
+    _attr_translation_key = "last_thirst_level"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_last_thirst_level"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_thirst_level_records(self._pet_id)
+        if records:
+            last_record = records[-1]
+            timestamp = last_record.timestamp
+            if timestamp.tzinfo is None:
+                timestamp = dt_util.as_utc(timestamp)
+            self._attr_native_value = timestamp
+            self._attr_extra_state_attributes = {
+                **self._attr_extra_state_attributes,
+                "level": last_record.level,
+                "notes": last_record.notes,
+            }
+        else:
+            self._attr_native_value = None
+            self._attr_extra_state_attributes = {
+                "pet": self._pet_data.name,
+                "integration": DOMAIN,
+            }
+
+
+class CurrentThirstLevelSensor(PetHealthSensorBase):
+    """Sensor showing the current thirst level."""
+
+    _attr_translation_key = "current_thirst_level"
+    _attr_icon = "mdi:water"
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_current_thirst_level"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_thirst_level_records(self._pet_id)
+        if records:
+            last_record = records[-1]
+            self._attr_native_value = last_record.level
+        else:
+            self._attr_native_value = None
+
+
+# Appetite Level Sensors (Symptoms/State)
+
+
+class LastAppetiteLevelTimestampSensor(PetHealthSensorBase):
+    """Sensor showing the timestamp of the last appetite level assessment."""
+
+    _attr_translation_key = "last_appetite_level"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_last_appetite_level"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_appetite_level_records(self._pet_id)
+        if records:
+            last_record = records[-1]
+            timestamp = last_record.timestamp
+            if timestamp.tzinfo is None:
+                timestamp = dt_util.as_utc(timestamp)
+            self._attr_native_value = timestamp
+            self._attr_extra_state_attributes = {
+                **self._attr_extra_state_attributes,
+                "level": last_record.level,
+                "notes": last_record.notes,
+            }
+        else:
+            self._attr_native_value = None
+            self._attr_extra_state_attributes = {
+                "pet": self._pet_data.name,
+                "integration": DOMAIN,
+            }
+
+
+class CurrentAppetiteLevelSensor(PetHealthSensorBase):
+    """Sensor showing the current appetite level."""
+
+    _attr_translation_key = "current_appetite_level"
+    _attr_icon = "mdi:food-apple"
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_current_appetite_level"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_appetite_level_records(self._pet_id)
+        if records:
+            last_record = records[-1]
+            self._attr_native_value = last_record.level
+        else:
+            self._attr_native_value = None
+
+
+# Weight Tracking Sensors
+
+
+class LastWeightTimestampSensor(PetHealthSensorBase):
+    """Sensor showing the timestamp of the last weight measurement."""
+
+    _attr_translation_key = "last_weight"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_last_weight"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_weight_records(self._pet_id)
+        if records:
+            last_record = records[-1]
+            timestamp = last_record.timestamp
+            if timestamp.tzinfo is None:
+                timestamp = dt_util.as_utc(timestamp)
+            self._attr_native_value = timestamp
+            self._attr_extra_state_attributes = {
+                **self._attr_extra_state_attributes,
+                "weight_grams": last_record.weight_grams,
+                "notes": last_record.notes,
+            }
+        else:
+            self._attr_native_value = None
+            self._attr_extra_state_attributes = {
+                "pet": self._pet_data.name,
+                "integration": DOMAIN,
+            }
+
+
+class CurrentWeightSensor(PetHealthSensorBase):
+    """Sensor showing the current weight in grams."""
+
+    _attr_translation_key = "current_weight"
+    _attr_device_class = SensorDeviceClass.WEIGHT
+    _attr_native_unit_of_measurement = "g"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_current_weight"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_weight_records(self._pet_id)
+        if records:
+            last_record = records[-1]
+            self._attr_native_value = last_record.weight_grams
+        else:
+            self._attr_native_value = None
+
+
+class WeightChange7DSensor(PetHealthSensorBase):
+    """Sensor showing weight change over the last 7 days."""
+
+    _attr_translation_key = "weight_change_7d"
+    _attr_device_class = SensorDeviceClass.WEIGHT
+    _attr_native_unit_of_measurement = "g"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:trending-up"
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_weight_change_7d"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_weight_records(self._pet_id)
+        if len(records) >= 2:
+            sorted_records = sorted(records, key=lambda r: r.timestamp, reverse=True)
+            current_weight = sorted_records[0].weight_grams
+            current_time = sorted_records[0].timestamp
+
+            # Find weight from 7 days ago or closest
+            for old_record in reversed(sorted_records[1:]):
+                days_ago = (current_time - old_record.timestamp).days
+                if days_ago >= 7:
+                    self._attr_native_value = current_weight - old_record.weight_grams
+                    return
+
+        self._attr_native_value = None
+
+
+class WeightChange30DSensor(PetHealthSensorBase):
+    """Sensor showing weight change over the last 30 days."""
+
+    _attr_translation_key = "weight_change_30d"
+    _attr_device_class = SensorDeviceClass.WEIGHT
+    _attr_native_unit_of_measurement = "g"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:trending-up"
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_weight_change_30d"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_weight_records(self._pet_id)
+        if len(records) >= 2:
+            sorted_records = sorted(records, key=lambda r: r.timestamp, reverse=True)
+            current_weight = sorted_records[0].weight_grams
+            current_time = sorted_records[0].timestamp
+
+            # Find weight from 30 days ago or closest
+            for old_record in reversed(sorted_records[1:]):
+                days_ago = (current_time - old_record.timestamp).days
+                if days_ago >= 30:
+                    self._attr_native_value = current_weight - old_record.weight_grams
+                    return
+
+        self._attr_native_value = None
+
+
+# Vomiting Tracking Sensors
+
+
+class LastVomitTimestampSensor(PetHealthSensorBase):
+    """Sensor showing the timestamp of the last vomiting incident."""
+
+    _attr_translation_key = "last_vomit"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_last_vomit"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_vomit_records(self._pet_id)
+        if records:
+            last_record = records[-1]
+            timestamp = last_record.timestamp
+            if timestamp.tzinfo is None:
+                timestamp = dt_util.as_utc(timestamp)
+            self._attr_native_value = timestamp
+            self._attr_extra_state_attributes = {
+                **self._attr_extra_state_attributes,
+                "vomit_type": last_record.vomit_type,
+                "notes": last_record.notes,
+            }
+        else:
+            self._attr_native_value = None
+            self._attr_extra_state_attributes = {
+                "pet": self._pet_data.name,
+                "integration": DOMAIN,
+            }
+
+
+class LastVomitTypeSensor(PetHealthSensorBase):
+    """Sensor showing the type of the last vomiting incident."""
+
+    _attr_translation_key = "last_vomit_type"
+    _attr_icon = "mdi:alert-circle"
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_last_vomit_type"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_vomit_records(self._pet_id)
+        if records:
+            last_record = records[-1]
+            self._attr_native_value = last_record.vomit_type
+        else:
+            self._attr_native_value = None
+
+
+class DailyVomitCountSensor(PetHealthSensorBase):
+    """Sensor showing the count of vomiting incidents today."""
+
+    _attr_translation_key = "daily_vomit_count"
+    _attr_state_class = SensorStateClass.TOTAL
+    _attr_icon = "mdi:counter"
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_daily_vomit_count"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_vomit_records(self._pet_id)
+        today = dt_util.start_of_local_day()
+
+        count = sum(
+            1 for record in records if dt_util.as_local(record.timestamp) >= today
+        )
+        self._attr_native_value = count
+
+
+class WeeklyVomitCountSensor(PetHealthSensorBase):
+    """Sensor showing the count of vomiting incidents this week."""
+
+    _attr_translation_key = "weekly_vomit_count"
+    _attr_state_class = SensorStateClass.TOTAL
+    _attr_icon = "mdi:counter"
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_weekly_vomit_count"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_vomit_records(self._pet_id)
+        week_ago = dt_util.now() - timedelta(days=7)
+
+        count = sum(1 for record in records if record.timestamp >= week_ago)
+        self._attr_native_value = count
+        self._attr_unique_id = f"{pet_id}_current_wellbeing_score"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_wellbeing_records(self._pet_id)
+        if records:
+            last_record = records[-1]
+            self._attr_native_value = last_record.wellbeing_score
+        else:
+            self._attr_native_value = None

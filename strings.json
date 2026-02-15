@@ -157,6 +157,30 @@
       },
       "current_wellbeing_score": {
         "name": "Current wellbeing score"
+      },
+      "last_weight": {
+        "name": "Last weight measurement"
+      },
+      "current_weight": {
+        "name": "Current weight"
+      },
+      "weight_change_7d": {
+        "name": "Weight change (7 days)"
+      },
+      "weight_change_30d": {
+        "name": "Weight change (30 days)"
+      },
+      "last_vomit": {
+        "name": "Last vomiting incident"
+      },
+      "last_vomit_type": {
+        "name": "Last vomit type"
+      },
+      "daily_vomit_count": {
+        "name": "Daily vomit count"
+      },
+      "weekly_vomit_count": {
+        "name": "Weekly vomit count"
       }
     }
   },
@@ -404,6 +428,50 @@
         "notes": {
           "name": "Notes",
           "description": "Additional notes about wellbeing"
+        }
+      }
+    },
+    "log_weight": {
+      "name": "Log weight",
+      "description": "Record a weight measurement for a pet",
+      "fields": {
+        "config_entry_id": {
+          "name": "Pet",
+          "description": "The pet being weighed"
+        },
+        "weight_grams": {
+          "name": "Weight (grams)",
+          "description": "Weight in grams (100-50000)"
+        },
+        "logged_at": {
+          "name": "Logged at",
+          "description": "When the measurement was taken. If not specified, uses current time."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Additional notes about the weight measurement"
+        }
+      }
+    },
+    "log_vomit": {
+      "name": "Log vomiting",
+      "description": "Record a vomiting incident for a pet",
+      "fields": {
+        "config_entry_id": {
+          "name": "Pet",
+          "description": "The pet that vomited"
+        },
+        "vomit_type": {
+          "name": "Vomit type",
+          "description": "Type of vomiting incident"
+        },
+        "logged_at": {
+          "name": "Logged at",
+          "description": "When the incident occurred. If not specified, uses current time."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Additional notes about the incident"
         }
       }
     }

@@ -449,3 +449,79 @@ log_wellbeing:
       selector:
         text:
           multiline: true
+
+log_weight:
+  name: Log weight
+  description: Record a weight measurement for a pet
+  fields:
+    config_entry_id:
+      name: Pet
+      description: The pet being weighed
+      required: true
+      selector:
+        config_entry:
+          integration: pet_health
+    weight_grams:
+      name: Weight (grams)
+      description: Weight in grams (100-50000)
+      required: true
+      selector:
+        number:
+          min: 100
+          max: 50000
+          step: 1
+          unit_of_measurement: g
+          mode: box
+    logged_at:
+      name: Logged at
+      description: When the measurement was taken. If not specified, uses current time.
+      required: false
+      selector:
+        datetime:
+    notes:
+      name: Notes
+      description: Additional notes about the weight measurement
+      required: false
+      selector:
+        text:
+          multiline: true
+
+log_vomit:
+  name: Log vomiting
+  description: Record a vomiting incident for a pet
+  fields:
+    config_entry_id:
+      name: Pet
+      description: The pet that vomited
+      required: true
+      selector:
+        config_entry:
+          integration: pet_health
+    vomit_type:
+      name: Vomit type
+      description: Type of vomiting incident
+      required: false
+      selector:
+        select:
+          options:
+            - label: Hairball
+              value: hairball
+            - label: Food
+              value: food
+            - label: Bile
+              value: bile
+            - label: Other
+              value: other
+    logged_at:
+      name: Logged at
+      description: When the incident occurred. If not specified, uses current time.
+      required: false
+      selector:
+        datetime:
+    notes:
+      name: Notes
+      description: Additional notes about the incident
+      required: false
+      selector:
+        text:
+          multiline: true

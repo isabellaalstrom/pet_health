@@ -17,6 +17,7 @@ from .const import (
     PoopColor,
     PoopConsistency,
     UrineAmount,
+    VomitType,
     WellbeingScore,
 )
 
@@ -288,6 +289,64 @@ class WellbeingRecord:
             pet_id=data["pet_id"],
             wellbeing_score=WellbeingScore(data["wellbeing_score"]),
             symptoms=data.get("symptoms", []),
+            notes=data.get("notes"),
+        )
+
+
+@dataclass
+class WeightRecord:
+    """Data model for a weight measurement."""
+
+    timestamp: datetime
+    pet_id: str
+    weight_grams: int
+    notes: str | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage."""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "pet_id": self.pet_id,
+            "weight_grams": self.weight_grams,
+            "notes": self.notes,
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> WeightRecord:
+        """Create from dictionary."""
+        return WeightRecord(
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            pet_id=data["pet_id"],
+            weight_grams=data["weight_grams"],
+            notes=data.get("notes"),
+        )
+
+
+@dataclass
+class VomitRecord:
+    """Data model for a vomiting incident."""
+
+    timestamp: datetime
+    pet_id: str
+    vomit_type: VomitType = VomitType.OTHER
+    notes: str | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage."""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "pet_id": self.pet_id,
+            "vomit_type": self.vomit_type,
+            "notes": self.notes,
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> VomitRecord:
+        """Create from dictionary."""
+        return VomitRecord(
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            pet_id=data["pet_id"],
+            vomit_type=VomitType(data.get("vomit_type", "other")),
             notes=data.get("notes"),
         )
 

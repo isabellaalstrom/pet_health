@@ -32,6 +32,8 @@ STORAGE_KEY_MEALS = "pet_health_meals"
 STORAGE_KEY_THIRST_LEVELS = "pet_health_thirst_levels"
 STORAGE_KEY_APPETITE_LEVELS = "pet_health_appetite_levels"
 STORAGE_KEY_WELLBEING = "pet_health_wellbeing"
+STORAGE_KEY_WEIGHT = "pet_health_weight"
+STORAGE_KEY_VOMIT = "pet_health_vomit"
 
 # Service names
 SERVICE_LOG_BATHROOM_VISIT = "log_bathroom_visit"
@@ -45,6 +47,8 @@ SERVICE_LOG_MEAL = "log_meal"
 SERVICE_LOG_THIRST = "log_thirst"
 SERVICE_LOG_APPETITE = "log_appetite"
 SERVICE_LOG_WELLBEING = "log_wellbeing"
+SERVICE_LOG_WEIGHT = "log_weight"
+SERVICE_LOG_VOMIT = "log_vomit"
 
 # Service attributes
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
@@ -72,6 +76,10 @@ ATTR_LEVEL = "level"
 ATTR_WELLBEING_SCORE = "wellbeing_score"
 ATTR_SYMPTOMS = "symptoms"
 ATTR_LOGGED_AT = "logged_at"
+
+# Weight and vomiting attributes
+ATTR_WEIGHT_GRAMS = "weight_grams"
+ATTR_VOMIT_TYPE = "vomit_type"
 
 
 class PetType(StrEnum):
@@ -148,3 +156,12 @@ class LevelState(StrEnum):
     NORMAL = "normal"
     LESSENED = "lessened"
     INCREASED = "increased"
+
+
+class VomitType(StrEnum):
+    """Types of vomiting."""
+
+    HAIRBALL = "hairball"
+    FOOD = "food"
+    BILE = "bile"
+    OTHER = "other"

@@ -34,6 +34,8 @@ from .const import (
     ATTR_UNIT,
     ATTR_URINE_AMOUNT,
     ATTR_VISIT_ID,
+    ATTR_VOMIT_TYPE,
+    ATTR_WEIGHT_GRAMS,
     ATTR_WELLBEING_SCORE,
     CONF_MEDICATION_DOSAGE,
     CONF_MEDICATION_ID,
@@ -53,6 +55,8 @@ from .const import (
     SERVICE_LOG_MEAL,
     SERVICE_LOG_MEDICATION,
     SERVICE_LOG_THIRST,
+    SERVICE_LOG_VOMIT,
+    SERVICE_LOG_WEIGHT,
     SERVICE_LOG_WELLBEING,
     SERVICE_REASSIGN_VISIT,
     ConsumptionAmount,
@@ -61,6 +65,7 @@ from .const import (
     PoopColor,
     PoopConsistency,
     UrineAmount,
+    VomitType,
     WellbeingScore,
 )
 from .models import (
@@ -72,6 +77,8 @@ from .models import (
     PetData,
     PetHealthConfigEntry,
     ThirstLevelRecord,
+    VomitRecord,
+    WeightRecord,
     WellbeingRecord,
 )
 from .store import PetHealthStore
@@ -201,6 +208,30 @@ SERVICE_LOG_WELLBEING_SCHEMA = vol.Schema(
         vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
         vol.Required(ATTR_WELLBEING_SCORE): vol.In([s.value for s in WellbeingScore]),
         vol.Optional(ATTR_SYMPTOMS): vol.All(cv.ensure_list, [cv.string]),
+        vol.Optional(ATTR_LOGGED_AT): cv.datetime,
+        vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
+# Schema for log_weight service
+SERVICE_LOG_WEIGHT_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Required(ATTR_WEIGHT_GRAMS): vol.All(
+            vol.Coerce(int), vol.Range(min=100, max=50000)
+        ),
+        vol.Optional(ATTR_LOGGED_AT): cv.datetime,
+        vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
+# Schema for log_vomit service
+SERVICE_LOG_VOMIT_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Optional(ATTR_VOMIT_TYPE, default="other"): vol.In(
+            [v.value for v in VomitType]
+        ),
         vol.Optional(ATTR_LOGGED_AT): cv.datetime,
         vol.Optional(ATTR_NOTES): cv.string,
     }
@@ -659,6 +690,127 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             "wellbeing_score": record.wellbeing_score,
         }
 
+    async def handle_log_weight(call: ServiceCall) -> ServiceResponse:
+        """Handle the log_weight service call."""
+        entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
+        entry = hass.config_entries.async_get_entry(entry_id)
+
+        if not entry:
+            raise HomeAssistantError(f"Config entry {entry_id} not found")
+
+        if entry.domain != DOMAIN:
+            raise HomeAssistantError(
+                f"Config entry {entry_id} is not a pet_health entry"
+            )
+
+        pet_data: PetData = entry.runtime_data
+
+        # Get timestamp (use provided or current)
+        logged_at = call.data.get(ATTR_LOGGED_AT)
+        if logged_at is None:
+            logged_at = dt_util.now()
+        else:
+            logged_at = dt_util.as_utc(logged_at)
+
+        # Create weight record
+        record = WeightRecord(
+            timestamp=logged_at,
+            pet_id=pet_data.pet_id,
+            weight_grams=call.data[ATTR_WEIGHT_GRAMS],
+            notes=call.data.get(ATTR_NOTES),
+        )
+
+        await store.async_save_weight(record)
+
+        # Calculate weight change over last 7 and 30 days
+        weight_records = store.get_weight_records(pet_data.pet_id)
+        weight_change_7d = None
+        weight_change_30d = None
+
+        if len(weight_records) >= 2:
+            # Sort by timestamp descending
+            sorted_records = sorted(
+                weight_records, key=lambda r: r.timestamp, reverse=True
+            )
+            current_weight = sorted_records[0].weight_grams
+
+            # Find weight from 7 days ago
+            for old_record in reversed(sorted_records[1:]):
+                days_ago = (logged_at - old_record.timestamp).days
+                if days_ago >= 7:
+                    weight_change_7d = current_weight - old_record.weight_grams
+                    break
+
+            # Find weight from 30 days ago
+            for old_record in reversed(sorted_records[1:]):
+                days_ago = (logged_at - old_record.timestamp).days
+                if days_ago >= 30:
+                    weight_change_30d = current_weight - old_record.weight_grams
+                    break
+
+        _LOGGER.info(
+            "Logged weight (%d grams) for %s at %s",
+            record.weight_grams,
+            pet_data.name,
+            record.timestamp,
+        )
+
+        response = {
+            "timestamp": record.timestamp.isoformat(),
+            "pet_name": pet_data.name,
+            "weight_grams": record.weight_grams,
+        }
+        if weight_change_7d is not None:
+            response["weight_change_7d"] = weight_change_7d
+        if weight_change_30d is not None:
+            response["weight_change_30d"] = weight_change_30d
+
+        return response
+
+    async def handle_log_vomit(call: ServiceCall) -> ServiceResponse:
+        """Handle the log_vomit service call."""
+        entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
+        entry = hass.config_entries.async_get_entry(entry_id)
+
+        if not entry:
+            raise HomeAssistantError(f"Config entry {entry_id} not found")
+
+        if entry.domain != DOMAIN:
+            raise HomeAssistantError(
+                f"Config entry {entry_id} is not a pet_health entry"
+            )
+
+        pet_data: PetData = entry.runtime_data
+
+        # Get timestamp (use provided or current)
+        logged_at = call.data.get(ATTR_LOGGED_AT)
+        if logged_at is None:
+            logged_at = dt_util.now()
+        else:
+            logged_at = dt_util.as_utc(logged_at)
+
+        # Create vomit record
+        record = VomitRecord(
+            timestamp=logged_at,
+            pet_id=pet_data.pet_id,
+            vomit_type=VomitType(call.data.get(ATTR_VOMIT_TYPE, "other")),
+            notes=call.data.get(ATTR_NOTES),
+        )
+
+        await store.async_save_vomit(record)
+        _LOGGER.info(
+            "Logged vomiting (%s) for %s at %s",
+            record.vomit_type,
+            pet_data.name,
+            record.timestamp,
+        )
+
+        return {
+            "timestamp": record.timestamp.isoformat(),
+            "pet_name": pet_data.name,
+            "vomit_type": record.vomit_type,
+        }
+
     # Register services
     hass.services.async_register(
         DOMAIN,
@@ -745,6 +897,22 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         SERVICE_LOG_WELLBEING,
         handle_log_wellbeing,
         schema=SERVICE_LOG_WELLBEING_SCHEMA,
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOG_WEIGHT,
+        handle_log_weight,
+        schema=SERVICE_LOG_WEIGHT_SCHEMA,
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOG_VOMIT,
+        handle_log_vomit,
+        schema=SERVICE_LOG_VOMIT_SCHEMA,
         supports_response=True,
     )
 
