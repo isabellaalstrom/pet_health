@@ -17,21 +17,31 @@ from .const import (
     ATTR_CONFIG_ENTRY_ID,
     ATTR_DID_PEE,
     ATTR_DID_POOP,
+    ATTR_DOSAGE,
+    ATTR_GIVEN_AT,
+    ATTR_MEDICATION_ID,
+    ATTR_MEDICATION_NAME,
     ATTR_NOTES,
     ATTR_POOP_COLOR,
     ATTR_POOP_CONSISTENCIES,
+    ATTR_REASON,
+    ATTR_UNIT,
     ATTR_URINE_AMOUNT,
+    CONF_MEDICATION_ID,
+    CONF_MEDICATION_NAME,
+    CONF_MEDICATIONS,
     CONF_PET_ID,
     CONF_PET_NAME,
     CONF_PET_TYPE,
     DOMAIN,
-    SERVICE_LOG_LITTER_BOX_VISIT,
+    SERVICE_LOG_BATHROOM_VISIT,
+    SERVICE_LOG_MEDICATION,
     PetType,
     PoopColor,
     PoopConsistency,
     UrineAmount,
 )
-from .models import LitterBoxVisit, PetData, PetHealthConfigEntry
+from .models import BathroomVisit, MedicationRecord, PetData, PetHealthConfigEntry
 from .store import PetHealthStore
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,8 +49,8 @@ _LOGGER = logging.getLogger(__name__)
 # Platforms to set up
 _PLATFORMS: list[Platform] = [Platform.SENSOR]
 
-# Schema for log_litter_box_visit service
-SERVICE_LOG_LITTER_BOX_VISIT_SCHEMA = vol.Schema(
+# Schema for log_bathroom_visit service
+SERVICE_LOG_BATHROOM_VISIT_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
         vol.Optional(ATTR_DID_PEE, default=False): cv.boolean,
@@ -54,6 +64,16 @@ SERVICE_LOG_LITTER_BOX_VISIT_SCHEMA = vol.Schema(
     }
 )
 
+# Schema for log_medication service
+SERVICE_LOG_MEDICATION_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Required(ATTR_MEDICATION_ID): cv.string,
+        vol.Optional(ATTR_GIVEN_AT): cv.datetime,
+        vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Pet Health integration."""
@@ -62,8 +82,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     await store.async_load()
     hass.data[DOMAIN] = {"store": store}
 
-    async def handle_log_litter_box_visit(call: ServiceCall) -> None:
-        """Handle the log_litter_box_visit service call."""
+    async def handle_log_bathroom_visit(call: ServiceCall) -> None:
+        """Handle the log_bathroom_visit service call."""
         entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
         entry = hass.config_entries.async_get_entry(entry_id)
 
@@ -103,7 +123,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             urine_amount = UrineAmount(urine_amount)
 
         # Create visit record
-        visit = LitterBoxVisit(
+        visit = BathroomVisit(
             timestamp=dt_util.now(),
             pet_id=pet_data.pet_id,
             did_pee=did_pee,
@@ -128,12 +148,72 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             visit.timestamp,
         )
 
-    # Register service
+    async def handle_log_medication(call: ServiceCall) -> None:
+        """Handle the log_medication service call."""
+        entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
+        entry = hass.config_entries.async_get_entry(entry_id)
+
+        if not entry:
+            raise HomeAssistantError(f"Config entry {entry_id} not found")
+
+        if entry.domain != DOMAIN:
+            raise HomeAssistantError(
+                f"Config entry {entry_id} is not a pet_health entry"
+            )
+
+        pet_data: PetData = entry.runtime_data
+
+        # Look up medication configuration
+        medication_id = call.data[ATTR_MEDICATION_ID]
+        medications = entry.options.get(CONF_MEDICATIONS, [])
+        medication_config = next(
+            (m for m in medications if m[CONF_MEDICATION_ID] == medication_id),
+            None,
+        )
+
+        if not medication_config:
+            raise HomeAssistantError(
+                f"Medication {medication_id} not found in configuration"
+            )
+
+        # Use provided timestamp or current time
+        timestamp = call.data.get(ATTR_GIVEN_AT, dt_util.now())
+        if timestamp and not timestamp.tzinfo:
+            timestamp = dt_util.as_utc(timestamp)
+
+        # Create medication record using configured medication info
+        medication = MedicationRecord(
+            timestamp=timestamp,
+            pet_id=pet_data.pet_id,
+            medication_name=medication_config[CONF_MEDICATION_NAME],
+            dosage=medication_config.get(CONF_MEDICATION_DOSAGE),
+            unit=medication_config.get(CONF_MEDICATION_UNIT),
+            reason=None,  # Not storing reason per dose
+            notes=call.data.get(ATTR_NOTES),
+        )
+
+        # Save to storage
+        await store.async_save_medication(medication)
+        _LOGGER.info(
+            "Logged %s medication for %s at %s",
+            medication.medication_name,
+            pet_data.name,
+            medication.timestamp,
+        )
+
+    # Register services
     hass.services.async_register(
         DOMAIN,
-        SERVICE_LOG_LITTER_BOX_VISIT,
-        handle_log_litter_box_visit,
-        schema=SERVICE_LOG_LITTER_BOX_VISIT_SCHEMA,
+        SERVICE_LOG_BATHROOM_VISIT,
+        handle_log_bathroom_visit,
+        schema=SERVICE_LOG_BATHROOM_VISIT_SCHEMA,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOG_MEDICATION,
+        handle_log_medication,
+        schema=SERVICE_LOG_MEDICATION_SCHEMA,
     )
 
     return True

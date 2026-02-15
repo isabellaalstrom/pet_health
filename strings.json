@@ -1,0 +1,188 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a pet",
+        "description": "Select the type of pet you want to add.",
+        "data": {
+          "pet_type": "Pet type"
+        }
+      },
+      "name": {
+        "title": "Name your pet",
+        "description": "Enter a name for your pet.",
+        "data": {
+          "pet_name": "Pet name"
+        }
+      }
+    },
+    "error": {
+      "empty_name": "Pet name cannot be empty."
+    },
+    "abort": {
+      "already_configured": "A pet with this name already exists."
+    }
+  },
+  "options": {
+    "step": {
+      "medication_list": {
+        "title": "Manage medications for {pet_name}",
+        "description": "Add, edit, or remove medications",
+        "data": {
+          "action": "Action"
+        }
+      },
+      "add_medication": {
+        "title": "Add medication",
+        "description": "Configure a new medication",
+        "data": {
+          "medication_name": "Medication name",
+          "dosage": "Dosage",
+          "unit": "Unit",
+          "medication_frequency": "Frequency",
+          "times": "Time(s) of day",
+          "start_date": "Start date",
+          "notes": "Notes"
+        }
+      },
+      "edit_medication": {
+        "title": "Edit medication",
+        "description": "Update medication settings",
+        "data": {
+          "medication_name": "Medication name",
+          "dosage": "Dosage",
+          "unit": "Unit",
+          "medication_frequency": "Frequency",
+          "times": "Time(s) of day",
+          "start_date": "Start date",
+          "active": "Active",
+          "notes": "Notes"
+        }
+      }
+    },
+    "error": {
+      "empty_name": "Medication name cannot be empty."
+    }
+  },
+  "selector": {
+    "pet_type": {
+      "options": {
+        "cat": "Cat",
+        "dog": "Dog",
+        "other": "Other"
+      }
+    },
+    "medication_frequency": {
+      "options": {
+        "as_needed": "As needed",
+        "daily": "Daily",
+        "twice_daily": "Twice daily",
+        "three_times_daily": "Three times daily",
+        "every_8_hours": "Every 8 hours",
+        "every_12_hours": "Every 12 hours",
+        "weekly": "Weekly"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "last_bathroom_visit": {
+        "name": "Last bathroom visit"
+      },
+      "daily_visit_count": {
+        "name": "Daily bathroom visits"
+      },
+      "weekly_visit_count": {
+        "name": "Weekly bathroom visits"
+      },
+      "hours_since_last_visit": {
+        "name": "Hours since last bathroom visit"
+      },
+      "last_poop_consistency": {
+        "name": "Last poop consistency"
+      },
+      "last_poop_color": {
+        "name": "Last poop color"
+      },
+      "last_urine_amount": {
+        "name": "Last urine amount"
+      },
+      "daily_pee_count": {
+        "name": "Daily pee visits"
+      },
+      "daily_poop_count": {
+        "name": "Daily poop visits"
+      }
+    }
+  },
+  "services": {
+    "log_bathroom_visit": {
+      "name": "Log bathroom visit",
+      "description": "Record a bathroom visit for a pet",
+      "fields": {
+        "config_entry_id": {
+          "name": "Pet",
+          "description": "The pet that had a bathroom visit"
+        },
+        "did_pee": {
+          "name": "Did pee",
+          "description": "Check if the pet urinated"
+        },
+        "did_poop": {
+          "name": "Did poop",
+          "description": "Check if the pet defecated"
+        },
+        "poop_consistencies": {
+          "name": "Poop consistencies",
+          "description": "The consistency of the poop - enter them in chronological order (e.g., normal, then diarrhea)"
+        },
+        "poop_color": {
+          "name": "Poop color",
+          "description": "The color of the poop"
+        },
+        "urine_amount": {
+          "name": "Urine amount",
+          "description": "The amount of urine"
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Additional notes about the visit"
+        }
+      }
+    },
+    "log_medication": {
+      "name": "Log medication",
+      "description": "Record a medication given to a pet",
+      "fields": {
+        "config_entry_id": {
+          "name": "Pet",
+          "description": "The pet that received the medication"
+        },
+        "medication_name": {
+          "name": "Medication name",
+          "description": "The name of the medication"
+        },
+        "dosage": {
+          "name": "Dosage",
+          "description": "The dosage amount"
+        },
+        "unit": {
+          "name": "Unit",
+          "description": "The unit of measurement (e.g., mg, ml, tablets)"
+        },
+        "reason": {
+          "name": "Reason",
+          "description": "The reason for the medication"
+        },
+        "given_at": {
+          "name": "Given at",
+          "description": "When the medication was given"
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Additional notes about the medication"
+        }
+      }
+    }
+  }
+}

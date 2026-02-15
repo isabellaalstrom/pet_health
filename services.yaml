@@ -1,10 +1,10 @@
-log_litter_box_visit:
-  name: Log litter box visit
-  description: Record a litter box visit for a pet
+log_bathroom_visit:
+  name: Log bathroom visit
+  description: Record a bathroom visit for a pet
   fields:
     config_entry_id:
       name: Pet
-      description: The pet that used the litter box
+      description: The pet that had a bathroom visit
       required: true
       selector:
         config_entry:
@@ -80,6 +80,55 @@ log_litter_box_visit:
     notes:
       name: Notes
       description: Additional notes about the visit
+      required: false
+      selector:
+        text:
+          multiline: true
+
+log_medication:
+  name: Log medication
+  description: Record a medication given to a pet
+  fields:
+    config_entry_id:
+      name: Pet
+      description: The pet that received the medication
+      required: true
+      selector:
+        config_entry:
+          integration: pet_health
+    medication_name:
+      name: Medication name
+      description: The name of the medication
+      required: true
+      selector:
+        text:
+    dosage:
+      name: Dosage
+      description: The dosage amount (e.g., "10", "5.5")
+      required: false
+      selector:
+        text:
+    unit:
+      name: Unit
+      description: The unit of measurement (e.g., "mg", "ml", "tablets")
+      required: false
+      selector:
+        text:
+    reason:
+      name: Reason
+      description: The reason for the medication (e.g., "flea prevention", "antibiotics")
+      required: false
+      selector:
+        text:
+    given_at:
+      name: Given at
+      description: When the medication was given (defaults to now)
+      required: false
+      selector:
+        datetime:
+    notes:
+      name: Notes
+      description: Additional notes about the medication
       required: false
       selector:
         text:

@@ -30,8 +30,8 @@ class PetData:
 
 
 @dataclass
-class LitterBoxVisit:
-    """Data model for a litter box visit."""
+class BathroomVisit:
+    """Data model for a bathroom visit."""
 
     timestamp: datetime
     pet_id: str
@@ -56,7 +56,7 @@ class LitterBoxVisit:
         }
 
     @staticmethod
-    def from_dict(data: dict) -> LitterBoxVisit:
+    def from_dict(data: dict) -> BathroomVisit:
         """Create from dictionary."""
         # Handle old format with visit_type (backwards compatibility)
         if "visit_type" in data:
@@ -67,7 +67,7 @@ class LitterBoxVisit:
             did_pee = data.get("did_pee", False)
             did_poop = data.get("did_poop", False)
 
-        return LitterBoxVisit(
+        return BathroomVisit(
             timestamp=datetime.fromisoformat(data["timestamp"]),
             pet_id=data["pet_id"],
             did_pee=did_pee,
@@ -81,6 +81,44 @@ class LitterBoxVisit:
             urine_amount=(
                 UrineAmount(data["urine_amount"]) if data.get("urine_amount") else None
             ),
+            notes=data.get("notes"),
+        )
+
+
+@dataclass
+class MedicationRecord:
+    """Data model for a medication record."""
+
+    timestamp: datetime
+    pet_id: str
+    medication_name: str
+    dosage: str | None = None
+    unit: str | None = None
+    reason: str | None = None
+    notes: str | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage."""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "pet_id": self.pet_id,
+            "medication_name": self.medication_name,
+            "dosage": self.dosage,
+            "unit": self.unit,
+            "reason": self.reason,
+            "notes": self.notes,
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> MedicationRecord:
+        """Create from dictionary."""
+        return MedicationRecord(
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            pet_id=data["pet_id"],
+            medication_name=data["medication_name"],
+            dosage=data.get("dosage"),
+            unit=data.get("unit"),
+            reason=data.get("reason"),
             notes=data.get("notes"),
         )
 

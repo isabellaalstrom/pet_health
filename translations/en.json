@@ -34,17 +34,17 @@
   },
   "entity": {
     "sensor": {
-      "last_litter_box_visit": {
-        "name": "Last litter box visit"
+      "last_bathroom_visit": {
+        "name": "Last bathroom visit"
       },
       "daily_visit_count": {
-        "name": "Daily litter box visits"
+        "name": "Daily bathroom visits"
       },
       "weekly_visit_count": {
-        "name": "Weekly litter box visits"
+        "name": "Weekly bathroom visits"
       },
       "hours_since_last_visit": {
-        "name": "Hours since last litter box visit"
+        "name": "Hours since last bathroom visit"
       },
       "last_poop_consistency": {
         "name": "Last poop consistency"
@@ -64,13 +64,13 @@
     }
   },
   "services": {
-    "log_litter_box_visit": {
-      "name": "Log litter box visit",
-      "description": "Record a litter box visit for a pet",
+    "log_bathroom_visit": {
+      "name": "Log bathroom visit",
+      "description": "Record a bathroom visit for a pet",
       "fields": {
         "config_entry_id": {
           "name": "Pet",
-          "description": "The pet that used the litter box"
+          "description": "The pet that had a bathroom visit"
         },
         "did_pee": {
           "name": "Did pee",

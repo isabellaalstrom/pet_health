@@ -15,7 +15,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
-from .models import LitterBoxVisit, PetHealthConfigEntry
+from .models import BathroomVisit, PetHealthConfigEntry
 from .store import PetHealthStore
 
 
@@ -88,11 +88,11 @@ class PetHealthSensorBase(SensorEntity):
         # Override in subclasses
         pass
 
-    def _get_visits(self) -> list[LitterBoxVisit]:
+    def _get_visits(self) -> list[BathroomVisit]:
         """Get all visits for this pet."""
         return self._store.get_visits(self._pet_id)
 
-    def _get_visits_since(self, since: datetime) -> list[LitterBoxVisit]:
+    def _get_visits_since(self, since: datetime) -> list[BathroomVisit]:
         """Get visits since a given time."""
         visits = self._get_visits()
         # Ensure both timestamps are timezone-aware for comparison
@@ -110,9 +110,9 @@ class PetHealthSensorBase(SensorEntity):
 
 
 class LastVisitTimestampSensor(PetHealthSensorBase):
-    """Sensor showing the timestamp of the last litter box visit."""
+    """Sensor showing the timestamp of the last bathroom visit."""
 
-    _attr_translation_key = "last_litter_box_visit"
+    _attr_translation_key = "last_bathroom_visit"
     _attr_device_class = SensorDeviceClass.TIMESTAMP
 
     def __init__(
@@ -120,7 +120,7 @@ class LastVisitTimestampSensor(PetHealthSensorBase):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(entry, store, pet_id)
-        self._attr_unique_id = f"{pet_id}_last_litter_box_visit"
+        self._attr_unique_id = f"{pet_id}_last_bathroom_visit"
 
     def _update_from_store(self) -> None:
         """Update the sensor value."""
@@ -146,7 +146,7 @@ class LastVisitTimestampSensor(PetHealthSensorBase):
 
 
 class DailyVisitCountSensor(PetHealthSensorBase):
-    """Sensor counting litter box visits today."""
+    """Sensor counting bathroom visits today."""
 
     _attr_translation_key = "daily_visit_count"
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
@@ -169,7 +169,7 @@ class DailyVisitCountSensor(PetHealthSensorBase):
 
 
 class WeeklyVisitCountSensor(PetHealthSensorBase):
-    """Sensor counting litter box visits this week."""
+    """Sensor counting bathroom visits this week."""
 
     _attr_translation_key = "weekly_visit_count"
     _attr_state_class = SensorStateClass.TOTAL
@@ -192,7 +192,7 @@ class WeeklyVisitCountSensor(PetHealthSensorBase):
 
 
 class HoursSinceLastVisitSensor(PetHealthSensorBase):
-    """Sensor showing hours since last litter box visit."""
+    """Sensor showing hours since last bathroom visit."""
 
     _attr_translation_key = "hours_since_last_visit"
     _attr_state_class = SensorStateClass.MEASUREMENT
