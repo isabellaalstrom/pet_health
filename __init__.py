@@ -280,9 +280,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         pet_data: PetData = entry.runtime_data
         did_pee = call.data.get(ATTR_DID_PEE, False)
         did_poop = call.data.get(ATTR_DID_POOP, False)
+        confirmed = call.data.get(ATTR_CONFIRMED, True)
 
-        # Validate that at least one action was selected
-        if not did_pee and not did_poop:
+        # Validate that at least one action was selected (only for confirmed visits)
+        if confirmed and not did_pee and not did_poop:
             raise HomeAssistantError("You must select at least pee or poop")
 
         # Apply defaults based on what was done
@@ -318,7 +319,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             pet_id=pet_data.pet_id,
             did_pee=did_pee,
             did_poop=did_poop,
-            confirmed=call.data.get(ATTR_CONFIRMED, True),
+            confirmed=confirmed,
             poop_consistencies=poop_consistencies,
             poop_color=poop_color,
             urine_amount=urine_amount,
