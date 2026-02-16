@@ -4,8 +4,8 @@ log_bathroom_visit:
   fields:
     config_entry_id:
       name: Pet
-      description: The pet that had a bathroom visit
-      required: true
+      description: The pet that had a bathroom visit. Can be omitted when confirmed is false (for unconfirmed/AI-detected visits).
+      required: false
       selector:
         config_entry:
           integration: pet_health
