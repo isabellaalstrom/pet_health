@@ -24,6 +24,7 @@ class PetHealthPanel extends HTMLElement {
     this._medicationsRetries = 0;
     this._storeDump = {};
     this._expandedSections = {};
+    this._eventUnsubscribe = null;
   }
 
   showLogMedicationDialog(pet, med) {
@@ -143,6 +144,11 @@ class PetHealthPanel extends HTMLElement {
       return;
     }
 
+    // Subscribe to data updates
+    if (!this._eventUnsubscribe) {
+      this._subscribeToDataUpdates();
+    }
+
     // Load config entries if not already loaded
     if (this._configEntries.length === 0 && !this._loadingEntries) {
       this.loadConfigEntries();
@@ -158,7 +164,77 @@ class PetHealthPanel extends HTMLElement {
   connectedCallback() {
     if (this.hass) {
       this.loadConfigEntries();
+      this._subscribeToDataUpdates();
     }
+  }
+
+  disconnectedCallback() {
+    this._unsubscribeFromDataUpdates();
+  }
+
+  _subscribeToDataUpdates() {
+    if (this._eventUnsubscribe) return;
+    
+    if (this.hass && this.hass.connection) {
+      this._eventUnsubscribe = this.hass.connection.subscribeEvents(
+        (event) => this._handleDataUpdate(event),
+        'pet_health_data_updated'
+      );
+    }
+  }
+
+  _unsubscribeFromDataUpdates() {
+    if (this._eventUnsubscribe) {
+      this._eventUnsubscribe.then((unsub) => unsub());
+      this._eventUnsubscribe = null;
+    }
+  }
+
+  async _handleDataUpdate(event) {
+    console.log('Pet health data updated:', event);
+    
+    // Clear the cache for the updated pet to force reload
+    const petId = event.data.pet_id;
+    const dataType = event.data.data_type;
+    
+    if (petId) {
+      this._visitsLoadedFor.delete(petId);
+      this._medicationsLoadedFor.delete(petId);
+    }
+    
+    // Reload data based on current view and selected pet
+    const selectedPet = this.getSelectedPet();
+    
+    // Reload store dump to get all updated data
+    try {
+      const dump = await this.hass.callWS({ type: 'pet_health/get_store_dump' });
+      this._storeDump = dump.data || {};
+      
+      // Flatten visits/medications for quick access
+      this._visits = [];
+      this._medications = [];
+      Object.keys(this._storeDump).forEach((pid) => {
+        const pd = this._storeDump[pid] || {};
+        (pd.visits || []).forEach((v) => {
+          const nv = Object.assign({}, v);
+          nv.confirmed = this._normalizeConfirmed(nv.confirmed);
+          this._visits.push(nv);
+        });
+        (pd.medications || []).forEach((m) => this._medications.push(m));
+      });
+      
+      // Sort descending by timestamp
+      this._visits.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+      this._medications.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+    } catch (err) {
+      console.log('Failed to reload store dump:', err);
+    }
+    
+    // Reload unknown visits if needed
+    await this.loadUnknownVisits();
+    
+    // Refresh the display
+    this.render();
   }
 
   async loadConfigEntries() {

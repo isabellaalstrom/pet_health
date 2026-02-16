@@ -48,6 +48,7 @@ from .const import (
     CONF_PET_NAME,
     CONF_PET_TYPE,
     DOMAIN,
+    EVENT_PET_HEALTH_DATA_UPDATED,
     SERVICE_AMEND_VISIT,
     SERVICE_CONFIRM_VISIT,
     SERVICE_DELETE_VISIT,
@@ -355,6 +356,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             visit.timestamp,
         )
 
+        # Fire event to notify frontend
+        hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+            "pet_id": pet_id,
+            "data_type": "visit",
+        })
+
         return {
             "visit_id": visit.visit_id,
             "timestamp": visit.timestamp.isoformat(),
@@ -425,6 +432,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             medication.timestamp,
         )
 
+        # Fire event to notify frontend
+        hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+            "pet_id": pet_data.pet_id,
+            "data_type": "medication",
+        })
+
         return {
             "medication_id": medication_id,
             "medication_name": medication_config[CONF_MEDICATION_NAME],
@@ -441,6 +454,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
         if await store.async_update_visit(visit_id, confirm):
             _LOGGER.info("Confirmed visit %s", visit_id)
+            
+            # Fire event to notify frontend
+            hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+                "data_type": "visit",
+            })
+            
             return {"visit_id": visit_id, "confirmed": True}
         else:
             raise HomeAssistantError(f"Visit {visit_id} not found")
@@ -467,6 +486,13 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
         if await store.async_update_visit(visit_id, reassign):
             _LOGGER.info("Reassigned visit %s to %s", visit_id, new_pet_data.name)
+            
+            # Fire event to notify frontend
+            hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+                "pet_id": new_pet_data.pet_id,
+                "data_type": "visit",
+            })
+            
             return {
                 "visit_id": visit_id,
                 "new_pet_name": new_pet_data.name,
@@ -481,6 +507,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
         if await store.async_delete_visit(visit_id):
             _LOGGER.info("Deleted visit %s", visit_id)
+            
+            # Fire event to notify frontend
+            hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+                "data_type": "visit",
+            })
+            
             return {"visit_id": visit_id, "deleted": True}
         else:
             raise HomeAssistantError(f"Visit {visit_id} not found")
@@ -506,6 +538,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
         if await store.async_update_visit(visit_id, amend):
             _LOGGER.info("Amended visit %s", visit_id)
+            
+            # Fire event to notify frontend
+            hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+                "data_type": "visit",
+            })
+            
             return {"visit_id": visit_id, "amended": True}
         else:
             raise HomeAssistantError(f"Visit {visit_id} not found")
@@ -547,6 +585,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             pet_data.name,
             record.timestamp,
         )
+
+        # Fire event to notify frontend
+        hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+            "pet_id": pet_data.pet_id,
+            "data_type": "drink",
+        })
 
         return {
             "timestamp": record.timestamp.isoformat(),
@@ -593,6 +637,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             record.timestamp,
         )
 
+        # Fire event to notify frontend
+        hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+            "pet_id": pet_data.pet_id,
+            "data_type": "meal",
+        })
+
         return {
             "timestamp": record.timestamp.isoformat(),
             "pet_name": pet_data.name,
@@ -636,6 +686,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             pet_data.name,
             record.timestamp,
         )
+
+        # Fire event to notify frontend
+        hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+            "pet_id": pet_data.pet_id,
+            "data_type": "thirst_level",
+        })
 
         return {
             "timestamp": record.timestamp.isoformat(),
@@ -681,6 +737,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             record.timestamp,
         )
 
+        # Fire event to notify frontend
+        hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+            "pet_id": pet_data.pet_id,
+            "data_type": "appetite_level",
+        })
+
         return {
             "timestamp": record.timestamp.isoformat(),
             "pet_name": pet_data.name,
@@ -725,6 +787,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             pet_data.name,
             record.timestamp,
         )
+
+        # Fire event to notify frontend
+        hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+            "pet_id": pet_data.pet_id,
+            "data_type": "wellbeing",
+        })
 
         return {
             "timestamp": record.timestamp.isoformat(),
@@ -797,6 +865,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             record.timestamp,
         )
 
+        # Fire event to notify frontend
+        hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+            "pet_id": pet_data.pet_id,
+            "data_type": "weight",
+        })
+
         response = {
             "timestamp": record.timestamp.isoformat(),
             "pet_name": pet_data.name,
@@ -846,6 +920,12 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             pet_data.name,
             record.timestamp,
         )
+
+        # Fire event to notify frontend
+        hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+            "pet_id": pet_data.pet_id,
+            "data_type": "vomit",
+        })
 
         return {
             "timestamp": record.timestamp.isoformat(),
