@@ -25,6 +25,7 @@ class PetHealthPanel extends HTMLElement {
     this._storeDump = {};
     this._expandedSections = {};
     this._eventUnsubscribe = null;
+    this._isRefreshingData = false;
   }
 
   showLogMedicationDialog(pet, med) {
@@ -200,48 +201,56 @@ class PetHealthPanel extends HTMLElement {
   }
 
   async _handleDataUpdate(event) {
-    // Clear the cache for the updated pet to force reload
-    const petId = event.data.pet_id;
-    const dataType = event.data.data_type;
-    
-    if (petId) {
-      this._visitsLoadedFor.delete(petId);
-      this._medicationsLoadedFor.delete(petId);
+    // Prevent concurrent refresh operations
+    if (this._isRefreshingData) {
+      return;
     }
     
-    // Reload data based on current view and selected pet
-    const selectedPet = this.getSelectedPet();
+    this._isRefreshingData = true;
     
-    // Reload store dump to get all updated data
     try {
-      const dump = await this.hass.callWS({ type: 'pet_health/get_store_dump' });
-      this._storeDump = dump.data || {};
+      // Clear the cache for the updated pet to force reload
+      const petId = event.data.pet_id;
+      const dataType = event.data.data_type;
       
-      // Flatten visits/medications for quick access
-      this._visits = [];
-      this._medications = [];
-      Object.keys(this._storeDump).forEach((pid) => {
-        const pd = this._storeDump[pid] || {};
-        (pd.visits || []).forEach((v) => {
-          const nv = Object.assign({}, v);
-          nv.confirmed = this._normalizeConfirmed(nv.confirmed);
-          this._visits.push(nv);
+      if (petId) {
+        this._visitsLoadedFor.delete(petId);
+        this._medicationsLoadedFor.delete(petId);
+      }
+      
+      // Reload store dump to get all updated data
+      try {
+        const dump = await this.hass.callWS({ type: 'pet_health/get_store_dump' });
+        this._storeDump = dump.data || {};
+        
+        // Flatten visits/medications for quick access
+        this._visits = [];
+        this._medications = [];
+        Object.keys(this._storeDump).forEach((pid) => {
+          const pd = this._storeDump[pid] || {};
+          (pd.visits || []).forEach((v) => {
+            const nv = Object.assign({}, v);
+            nv.confirmed = this._normalizeConfirmed(nv.confirmed);
+            this._visits.push(nv);
+          });
+          (pd.medications || []).forEach((m) => this._medications.push(m));
         });
-        (pd.medications || []).forEach((m) => this._medications.push(m));
-      });
+        
+        // Sort descending by timestamp
+        this._visits.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+        this._medications.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+      } catch (err) {
+        console.error('Pet health panel: Failed to reload store dump after data update:', err);
+      }
       
-      // Sort descending by timestamp
-      this._visits.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
-      this._medications.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
-    } catch (err) {
-      console.error('Pet health panel: Failed to reload store dump after data update:', err);
+      // Reload unknown visits if needed
+      await this.loadUnknownVisits();
+      
+      // Refresh the display
+      this.render();
+    } finally {
+      this._isRefreshingData = false;
     }
-    
-    // Reload unknown visits if needed
-    await this.loadUnknownVisits();
-    
-    // Refresh the display
-    this.render();
   }
 
   async loadConfigEntries() {
