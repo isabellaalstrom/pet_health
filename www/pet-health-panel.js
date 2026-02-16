@@ -13,6 +13,8 @@ class PetHealthPanel extends HTMLElement {
     this._loadingEntries = false;
     this._visits = [];
     this._loadingVisits = false;
+    this._unknownVisits = [];
+    this._loadingUnknownVisits = false;
     this._medications = [];
     this._loadingMedications = false;
     this._medicationsLoadedFor = new Set();
@@ -196,6 +198,10 @@ class PetHealthPanel extends HTMLElement {
         console.log('Failed to load store dump:', err);
         this._storeDump = {};
       }
+
+      // Load unknown visits
+      await this.loadUnknownVisits();
+
       // Config entries loaded
 
       // Select first pet if none selected
@@ -261,13 +267,15 @@ class PetHealthPanel extends HTMLElement {
       this._selectedPetId = pets[0].entry_id;
     }
 
-    // Compute unconfirmed visits count for selected pet (for badge)
+    // Compute unconfirmed visits count for selected pet (for badge) + unknown visits count
     const selectedPet = this.getSelectedPet();
     let unconfirmedCount = 0;
     if (selectedPet) {
       const selInternal = this.getPetIdFromEntry(selectedPet.entry_id);
       unconfirmedCount = this._visits.filter(v => v.pet_id === selectedPet.entry_id || v.pet_id === selInternal).filter(v => !v.confirmed).length;
     }
+    // Add unknown visits to the badge count
+    unconfirmedCount += (this._unknownVisits || []).length;
 
     // Determine whether selected pet has medications to show/hide tab
     let hasMedications = false;
@@ -665,9 +673,26 @@ class PetHealthPanel extends HTMLElement {
     const unconfirmedShown = unconfirmedExpanded ? unconfirmedVisits : unconfirmedVisits.slice(0, 5);
     const confirmedShown = confirmedExpanded ? confirmedVisits : confirmedVisits.slice(0, 5);
 
+    // Get unknown visits (for all pets)
+    const unknownVisits = this._unknownVisits || [];
+    const unknownKey = 'visits_unknown';
+    const unknownExpanded = !!this._expandedSections[unknownKey];
+    const unknownShown = unknownExpanded ? unknownVisits : unknownVisits.slice(0, 5);
+
     return `
       <div class="content-area">
         <h2>Bathroom Visit History for ${pet.name}</h2>
+
+        ${unknownVisits.length > 0 ? `
+          <div style="margin-bottom: 32px;">
+            <h3 style="color: #9c27b0; margin-bottom: 16px;">❓ Unknown Pet Visits (${unknownVisits.length})</h3>
+            <p style="color: var(--secondary-text-color); margin-bottom: 12px; font-size: 13px;">
+              These visits were detected but don't have a pet assigned. Use "Reassign" to assign them to the correct pet.
+            </p>
+            ${this.renderVisitsTable(unknownShown, true)}
+            ${unknownVisits.length > 5 ? `<div style="margin-top:8px"><button class="show-more-btn" data-section="visits_unknown">${unknownExpanded ? 'Show less' : 'Show more'}</button></div>` : ''}
+          </div>
+        ` : ''}
 
         ${unconfirmedVisits.length > 0 ? `
           <div style="margin-bottom: 32px;">
@@ -847,6 +872,29 @@ class PetHealthPanel extends HTMLElement {
       }
     } finally {
       this._loadingVisits = false;
+      this.render();
+    }
+  }
+
+  async loadUnknownVisits() {
+    if (this._loadingUnknownVisits) return;
+    this._loadingUnknownVisits = true;
+
+    try {
+      const result = await this.hass.callWS({ type: 'pet_health/get_unknown_visits' });
+      this._unknownVisits = (result.visits || []).map((v) => ({ ...v, confirmed: this._normalizeConfirmed(v.confirmed) }));
+      
+      // Sort by timestamp, newest first
+      const toTs = (t) => {
+        if (!t) return 0;
+        try { const d = new Date(t); return Number.isNaN(d.getTime()) ? 0 : d.getTime(); } catch (e) { return 0; }
+      };
+      this._unknownVisits.sort((a, b) => toTs(b.timestamp) - toTs(a.timestamp));
+    } catch (err) {
+      console.error('Failed to load unknown visits:', err);
+      this._unknownVisits = [];
+    } finally {
+      this._loadingUnknownVisits = false;
       this.render();
     }
   }
@@ -1545,7 +1593,7 @@ class PetHealthPanel extends HTMLElement {
       button.addEventListener('click', () => {
         const section = button.dataset.section;
         const petId = button.dataset.pet;
-        const key = `${section}:${petId}`;
+        const key = petId ? `${section}:${petId}` : section;
         this._expandedSections[key] = !this._expandedSections[key];
         this.render();
       });
@@ -1655,7 +1703,13 @@ class PetHealthPanel extends HTMLElement {
   }
 
   async handleVisitAction(action, visitId) {
-    const visit = this._visits.find(v => v.visit_id === visitId);
+    // Check both regular visits and unknown visits
+    let visit = this._visits.find(v => v.visit_id === visitId);
+    const unknownVisit = !visit && this._unknownVisits && this._unknownVisits.find(v => v.visit_id === visitId);
+    if (unknownVisit) {
+      visit = unknownVisit;
+    }
+    
     if (!visit) {
       alert('Visit not found');
       return;
@@ -1669,6 +1723,7 @@ class PetHealthPanel extends HTMLElement {
           });
           alert('✅ Visit confirmed!');
           await this.loadVisits();
+          if (unknownVisit) await this.loadUnknownVisits();
           break;
 
         case 'reassign':
@@ -1684,6 +1739,7 @@ class PetHealthPanel extends HTMLElement {
               });
               alert(`✅ Visit reassigned to ${selectedPet.name}!`);
               await this.loadVisits();
+              if (unknownVisit) await this.loadUnknownVisits();
             }
           }
           break;
@@ -1699,6 +1755,7 @@ class PetHealthPanel extends HTMLElement {
             });
             alert('✅ Visit deleted!');
             await this.loadVisits();
+            if (unknownVisit) await this.loadUnknownVisits();
           }
           break;
       }

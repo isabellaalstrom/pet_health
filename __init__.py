@@ -61,6 +61,7 @@ from .const import (
     SERVICE_LOG_WEIGHT,
     SERVICE_LOG_WELLBEING,
     SERVICE_REASSIGN_VISIT,
+    UNKNOWN_ENTRY_ID,
     ConsumptionAmount,
     LevelState,
     PetType,
@@ -95,7 +96,7 @@ _PLATFORMS: list[Platform] = [Platform.SENSOR]
 # Schema for log_bathroom_visit service
 SERVICE_LOG_BATHROOM_VISIT_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
         vol.Optional(ATTR_DID_PEE, default=False): cv.boolean,
         vol.Optional(ATTR_DID_POOP, default=False): cv.boolean,
         vol.Optional(
@@ -266,21 +267,35 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
     async def handle_log_bathroom_visit(call: ServiceCall) -> ServiceResponse:
         """Handle the log_bathroom_visit service call."""
-        entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
-        entry = hass.config_entries.async_get_entry(entry_id)
+        entry_id = call.data.get(ATTR_CONFIG_ENTRY_ID)
+        confirmed = call.data.get(ATTR_CONFIRMED, True)
+        
+        # If entry_id is not provided or is the unknown constant, handle as unknown pet
+        if not entry_id or entry_id == UNKNOWN_ENTRY_ID:
+            if confirmed:
+                raise HomeAssistantError(
+                    "config_entry_id is required for confirmed visits"
+                )
+            # Use UNKNOWN_ENTRY_ID for unknown pets
+            pet_id = UNKNOWN_ENTRY_ID
+            pet_name = "Unknown Pet"
+        else:
+            entry = hass.config_entries.async_get_entry(entry_id)
 
-        if not entry:
-            raise HomeAssistantError(f"Config entry {entry_id} not found")
+            if not entry:
+                raise HomeAssistantError(f"Config entry {entry_id} not found")
 
-        if entry.domain != DOMAIN:
-            raise HomeAssistantError(
-                f"Config entry {entry_id} is not a pet_health entry"
-            )
+            if entry.domain != DOMAIN:
+                raise HomeAssistantError(
+                    f"Config entry {entry_id} is not a pet_health entry"
+                )
 
-        pet_data: PetData = entry.runtime_data
+            pet_data: PetData = entry.runtime_data
+            pet_id = pet_data.pet_id
+            pet_name = pet_data.name
+
         did_pee = call.data.get(ATTR_DID_PEE, False)
         did_poop = call.data.get(ATTR_DID_POOP, False)
-        confirmed = call.data.get(ATTR_CONFIRMED, True)
 
         # Validate that at least one action was selected (only for confirmed visits)
         if confirmed and not did_pee and not did_poop:
@@ -316,7 +331,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         # Create visit record
         visit = BathroomVisit(
             timestamp=timestamp,
-            pet_id=pet_data.pet_id,
+            pet_id=pet_id,
             did_pee=did_pee,
             did_poop=did_poop,
             confirmed=confirmed,
@@ -335,15 +350,15 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             actions.append("poop")
         _LOGGER.info(
             "Logged %s visit for %s at %s",
-            " and ".join(actions),
-            pet_data.name,
+            " and ".join(actions) if actions else "bathroom",
+            pet_name,
             visit.timestamp,
         )
 
         return {
             "visit_id": visit.visit_id,
             "timestamp": visit.timestamp.isoformat(),
-            "pet_name": pet_data.name,
+            "pet_name": pet_name,
         }
 
     async def handle_log_medication(call: ServiceCall) -> ServiceResponse:

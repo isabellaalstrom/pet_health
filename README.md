@@ -136,6 +136,32 @@ data:
 
 Replace `<your-pet-config-entry-id>` with the config entry selected in the service UI or copied from the integration entry.
 
+### Unknown Pet Visits (AI Detection Support)
+
+**New in this version**: You can now log bathroom visits without specifying which pet, useful for AI-based detection systems:
+
+```yaml
+service: pet_health.log_bathroom_visit
+data:
+  did_pee: true
+  did_poop: false
+  confirmed: false
+  notes: "Detected by AI camera"
+```
+
+When `confirmed: false` and `config_entry_id` is omitted:
+- Visit is stored with a special "unknown" identifier
+- Appears in "Unknown Pet Visits" section in the UI
+- Can be reassigned to the correct pet later
+- Badge shows count of unconfirmed + unknown visits
+
+This is particularly useful for:
+- AI-powered litter box cameras
+- Motion detection systems
+- Automated pet monitoring setups
+
+**Note**: Confirmed visits (`confirmed: true`) still require `config_entry_id`.
+
 ## Automations & Dashboards
 
 - Use the provided sensors in Lovelace cards to show daily counts, last visit timestamp and trends.

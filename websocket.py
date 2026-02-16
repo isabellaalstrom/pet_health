@@ -21,6 +21,7 @@ def async_register_websocket_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, handle_get_pet_data)
     websocket_api.async_register_command(hass, handle_get_medications)
     websocket_api.async_register_command(hass, handle_get_store_dump)
+    websocket_api.async_register_command(hass, handle_get_unknown_visits)
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -294,3 +295,49 @@ async def handle_get_store_dump(
     _LOGGER.debug("pet_health.get_store_dump: returning %d pets", len(result["data"]))
 
     connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "pet_health/get_unknown_visits",
+    }
+)
+@websocket_api.async_response
+async def handle_get_unknown_visits(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Handle get unknown visits command."""
+    from .const import UNKNOWN_ENTRY_ID
+    
+    store: PetHealthStore = hass.data[DOMAIN]["store"]
+
+    _LOGGER.debug("pet_health.get_unknown_visits called")
+
+    # Get visits with unknown entry_id
+    unknown_visits = store.get_visits(UNKNOWN_ENTRY_ID)
+
+    # Convert visits to JSON-serializable format
+    visits_data = [
+        {
+            "visit_id": visit.visit_id,
+            "timestamp": visit.timestamp.isoformat(),
+            "pet_id": visit.pet_id,
+            "did_pee": visit.did_pee,
+            "did_poop": visit.did_poop,
+            "confirmed": visit.confirmed,
+            "poop_consistencies": visit.poop_consistencies,
+            "poop_color": visit.poop_color,
+            "urine_amount": visit.urine_amount,
+            "notes": visit.notes,
+        }
+        for visit in unknown_visits
+    ]
+
+    # Sort by timestamp descending
+    visits_data.sort(key=lambda v: v["timestamp"], reverse=True)
+
+    _LOGGER.debug("pet_health.get_unknown_visits: returning %d visits", len(visits_data))
+
+    connection.send_result(msg["id"], {"visits": visits_data})

@@ -4,6 +4,9 @@ from enum import StrEnum
 
 DOMAIN = "pet_health"
 
+# Special entry ID for unknown pets (for unconfirmed visits)
+UNKNOWN_ENTRY_ID = "00000000-0000-0000-0000-000000000000"
+
 # Config entry data keys
 CONF_PET_TYPE = "pet_type"
 CONF_PET_NAME = "pet_name"
