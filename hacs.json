@@ -1,0 +1,7 @@
+{
+  "name": "Pet Health",
+  "content_in_root": true,
+  "domains": ["integration"],
+  "filename": "custom_components/pet_health",
+  "version": "0.1.0"
+}
