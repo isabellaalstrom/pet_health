@@ -179,23 +179,27 @@ class PetHealthPanel extends HTMLElement {
     if (this._eventUnsubscribe) return;
     
     if (this.hass && this.hass.connection) {
-      this._eventUnsubscribe = this.hass.connection.subscribeEvents(
-        (event) => this._handleDataUpdate(event),
-        'pet_health_data_updated'
-      );
+      try {
+        this._eventUnsubscribe = this.hass.connection.subscribeEvents(
+          (event) => this._handleDataUpdate(event),
+          'pet_health_data_updated'
+        );
+      } catch (err) {
+        console.warn('Pet health panel: Failed to subscribe to data update events:', err);
+      }
     }
   }
 
   _unsubscribeFromDataUpdates() {
     if (this._eventUnsubscribe) {
-      this._eventUnsubscribe.then((unsub) => unsub());
+      this._eventUnsubscribe.then((unsub) => unsub()).catch((err) => {
+        console.warn('Pet health panel: Failed to unsubscribe from data update events:', err);
+      });
       this._eventUnsubscribe = null;
     }
   }
 
   async _handleDataUpdate(event) {
-    console.log('Pet health data updated:', event);
-    
     // Clear the cache for the updated pet to force reload
     const petId = event.data.pet_id;
     const dataType = event.data.data_type;
@@ -230,7 +234,7 @@ class PetHealthPanel extends HTMLElement {
       this._visits.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
       this._medications.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
     } catch (err) {
-      console.log('Failed to reload store dump:', err);
+      console.error('Pet health panel: Failed to reload store dump after data update:', err);
     }
     
     // Reload unknown visits if needed
