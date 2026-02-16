@@ -449,6 +449,13 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         """Handle the confirm_visit service call."""
         visit_id = call.data[ATTR_VISIT_ID]
 
+        # Get the visit before updating to retrieve pet_id for event
+        result = store.find_visit(visit_id)
+        if not result:
+            raise HomeAssistantError(f"Visit {visit_id} not found")
+        
+        pet_id, visit = result
+
         def confirm(visit: BathroomVisit) -> None:
             visit.confirmed = True
 
@@ -457,6 +464,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             
             # Fire event to notify frontend
             hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+                "pet_id": pet_id,
                 "data_type": "visit",
             })
             
@@ -505,11 +513,19 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         """Handle the delete_visit service call."""
         visit_id = call.data[ATTR_VISIT_ID]
 
+        # Get the visit before deleting to retrieve pet_id for event
+        result = store.find_visit(visit_id)
+        if not result:
+            raise HomeAssistantError(f"Visit {visit_id} not found")
+        
+        pet_id, visit = result
+
         if await store.async_delete_visit(visit_id):
             _LOGGER.info("Deleted visit %s", visit_id)
             
             # Fire event to notify frontend
             hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+                "pet_id": pet_id,
                 "data_type": "visit",
             })
             
@@ -520,6 +536,13 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     async def handle_amend_visit(call: ServiceCall) -> ServiceResponse:
         """Handle the amend_visit service call."""
         visit_id = call.data[ATTR_VISIT_ID]
+
+        # Get the visit before updating to retrieve pet_id for event
+        result = store.find_visit(visit_id)
+        if not result:
+            raise HomeAssistantError(f"Visit {visit_id} not found")
+        
+        pet_id, visit = result
 
         def amend(visit: BathroomVisit) -> None:
             # Update only the fields that were provided
@@ -541,6 +564,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             
             # Fire event to notify frontend
             hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+                "pet_id": pet_id,
                 "data_type": "visit",
             })
             

@@ -164,7 +164,10 @@ class PetHealthPanel extends HTMLElement {
   connectedCallback() {
     if (this.hass) {
       this.loadConfigEntries();
-      this._subscribeToDataUpdates();
+      // Only subscribe if not already subscribed
+      if (!this._eventUnsubscribe) {
+        this._subscribeToDataUpdates();
+      }
     }
   }
 
