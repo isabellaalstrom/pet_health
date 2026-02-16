@@ -10,8 +10,8 @@ This is a **Home Assistant custom component** (integration) for tracking and log
 - HACS (Home Assistant Community Store) compatible
 - No external dependencies beyond Home Assistant core
 
-**Version:** 0.3.0  
-**Code Owner:** @isabellaalstrom
+**Code Owner:** @isabellaalstrom  
+**Current Version:** See `manifest.json` for the latest version
 
 ## Project Structure
 
@@ -101,8 +101,11 @@ pet_health/
 
 ### Sensor Naming
 - Format: `sensor.<pet_name>_<metric>`
-- Examples: `sensor.fluffy_last_bathroom_visit`, `sensor.fluffy_daily_visit_count`
-- Medication sensors: `sensor.<pet>_medication_<med_id>_last_dose`
+  - `<pet_name>` is the pet's name in lowercase with spaces replaced by underscores
+  - `<metric>` is the measurement type (e.g., `last_bathroom_visit`, `daily_visit_count`)
+- Examples: `sensor.fluffy_last_bathroom_visit`, `sensor.mr_whiskers_daily_visit_count`
+- Medication sensors: `sensor.<pet_name>_medication_<med_id>_last_dose`
+  - `<med_id>` is the medication identifier configured in pet options
 
 ### Service Conventions
 - All services accept `config_entry_id` to identify the pet
