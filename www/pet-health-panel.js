@@ -1705,9 +1705,9 @@ class PetHealthPanel extends HTMLElement {
   async handleVisitAction(action, visitId) {
     // Check both regular visits and unknown visits
     let visit = this._visits.find(v => v.visit_id === visitId);
-    const isUnknownVisit = !visit && this._unknownVisits && this._unknownVisits.find(v => v.visit_id === visitId);
-    if (isUnknownVisit) {
-      visit = isUnknownVisit;
+    const unknownVisit = !visit && this._unknownVisits && this._unknownVisits.find(v => v.visit_id === visitId);
+    if (unknownVisit) {
+      visit = unknownVisit;
     }
     
     if (!visit) {
@@ -1723,7 +1723,7 @@ class PetHealthPanel extends HTMLElement {
           });
           alert('✅ Visit confirmed!');
           await this.loadVisits();
-          if (isUnknownVisit) await this.loadUnknownVisits();
+          if (unknownVisit) await this.loadUnknownVisits();
           break;
 
         case 'reassign':
@@ -1739,7 +1739,7 @@ class PetHealthPanel extends HTMLElement {
               });
               alert(`✅ Visit reassigned to ${selectedPet.name}!`);
               await this.loadVisits();
-              if (isUnknownVisit) await this.loadUnknownVisits();
+              if (unknownVisit) await this.loadUnknownVisits();
             }
           }
           break;
@@ -1755,7 +1755,7 @@ class PetHealthPanel extends HTMLElement {
             });
             alert('✅ Visit deleted!');
             await this.loadVisits();
-            if (isUnknownVisit) await this.loadUnknownVisits();
+            if (unknownVisit) await this.loadUnknownVisits();
           }
           break;
       }

@@ -270,13 +270,13 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         entry_id = call.data.get(ATTR_CONFIG_ENTRY_ID)
         confirmed = call.data.get(ATTR_CONFIRMED, True)
         
-        # If entry_id is not provided or is empty/unknown, and confirmed is False, use UNKNOWN_ENTRY_ID
+        # If entry_id is not provided or is the unknown constant, handle as unknown pet
         if not entry_id or entry_id == UNKNOWN_ENTRY_ID:
             if confirmed:
                 raise HomeAssistantError(
                     "config_entry_id is required for confirmed visits"
                 )
-            entry_id = UNKNOWN_ENTRY_ID
+            # Use UNKNOWN_ENTRY_ID for unknown pets
             pet_id = UNKNOWN_ENTRY_ID
             pet_name = "Unknown Pet"
         else:
