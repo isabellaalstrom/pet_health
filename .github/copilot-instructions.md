@@ -102,6 +102,7 @@ pet_health/
 ### Sensor Naming
 - Format: `sensor.<pet_name>_<metric>`
   - `<pet_name>` is the pet's name in lowercase with spaces replaced by underscores
+  - Special characters, apostrophes, hyphens should be removed or replaced with underscores
   - `<metric>` is the measurement type (e.g., `last_bathroom_visit`, `daily_visit_count`)
 - Examples: `sensor.fluffy_last_bathroom_visit`, `sensor.mr_whiskers_daily_visit_count`
 - Medication sensors: `sensor.<pet_name>_medication_<med_id>_last_dose`
@@ -159,7 +160,7 @@ For manual testing:
 
 ## Special Features to Remember
 
-### Unknown Pet Visits (AI Support)
+### Unknown Pet Visits (AI-Detected)
 - Services can log visits without `config_entry_id` when `confirmed: false`
 - These appear in "Unknown Pet Visits" UI section
 - Use `reassign_visit` service to assign to correct pet later
