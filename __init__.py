@@ -107,6 +107,7 @@ SERVICE_LOG_BATHROOM_VISIT_SCHEMA = vol.Schema(
         vol.Optional(ATTR_POOP_COLOR): vol.In([c.value for c in PoopColor]),
         vol.Optional(ATTR_URINE_AMOUNT): vol.In([a.value for a in UrineAmount]),
         vol.Optional(ATTR_NOTES): cv.string,
+        vol.Optional(ATTR_LOGGED_AT): cv.datetime,
     }
 )
 
@@ -116,6 +117,8 @@ SERVICE_LOG_MEDICATION_SCHEMA = vol.Schema(
         vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
         vol.Required(ATTR_MEDICATION_ID): cv.string,
         vol.Optional(ATTR_GIVEN_AT): cv.datetime,
+        vol.Optional(ATTR_DOSAGE): cv.string,
+        vol.Optional(ATTR_UNIT): cv.string,
         vol.Optional(ATTR_NOTES): cv.string,
     }
 )
@@ -302,14 +305,20 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             urine_amount = UrineAmount(urine_amount)
 
         # Create visit record
+        # Determine timestamp (use provided logged_at or current time)
+        logged_at = call.data.get(ATTR_LOGGED_AT)
+        if logged_at is None:
+            timestamp = dt_util.now()
+        else:
+            timestamp = dt_util.as_utc(logged_at)
+
+        # Create visit record
         visit = BathroomVisit(
-            timestamp=dt_util.now(),
+            timestamp=timestamp,
             pet_id=pet_data.pet_id,
             did_pee=did_pee,
             did_poop=did_poop,
-            confirmed=call.data.get(
-                ATTR_CONFIRMED, True
-            ),  # True for manual, False for AI
+            confirmed=call.data.get(ATTR_CONFIRMED, True),
             poop_consistencies=poop_consistencies,
             poop_color=poop_color,
             urine_amount=urine_amount,
@@ -380,12 +389,13 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             _LOGGER.debug("Using provided timestamp: %s", timestamp)
 
         # Create medication record using configured medication info
+        # Allow dosage and unit to be overridden per dose, defaulting to config
         medication = MedicationRecord(
             timestamp=timestamp,
             pet_id=pet_data.pet_id,
             medication_name=medication_config[CONF_MEDICATION_NAME],
-            dosage=medication_config.get(CONF_MEDICATION_DOSAGE),
-            unit=medication_config.get(CONF_MEDICATION_UNIT),
+            dosage=call.data.get(ATTR_DOSAGE) or medication_config.get(CONF_MEDICATION_DOSAGE),
+            unit=call.data.get(ATTR_UNIT) or medication_config.get(CONF_MEDICATION_UNIT),
             reason=None,  # Not storing reason per dose
             notes=call.data.get(ATTR_NOTES),
         )

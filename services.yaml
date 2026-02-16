@@ -91,6 +91,12 @@ log_bathroom_visit:
       default: true
       selector:
         boolean:
+    logged_at:
+      name: When
+      description: When the visit occurred. If not specified, uses current time
+      required: false
+      selector:
+        datetime:
 
 log_medication:
   name: Log medication

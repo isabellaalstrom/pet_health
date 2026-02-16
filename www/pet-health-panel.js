@@ -24,6 +24,99 @@ class PetHealthPanel extends HTMLElement {
     this._expandedSections = {};
   }
 
+  showLogMedicationDialog(pet, med) {
+    // Remove existing dialog if present
+    const existing = this.querySelector('.ph-med-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.className = 'ph-med-modal';
+    modal.innerHTML = `
+      <style>
+        .ph-med-modal { position: fixed; inset: 0; display:flex; align-items:center; justify-content:center; z-index:10000; }
+        .ph-med-modal-backdrop { position:absolute; inset:0; background: rgba(0,0,0,0.45); }
+        .ph-med-modal-card { position:relative; background: var(--card-background-color); color: var(--primary-text-color); border-radius:8px; padding:20px; width:520px; box-shadow: var(--ha-card-box-shadow); z-index:10001; }
+        .ph-med-form-row { display:flex; gap:8px; margin-bottom:8px; align-items:center; }
+        .ph-med-form-row > label { min-width:120px; font-size:13px; color:var(--secondary-text-color); }
+        .ph-med-form-row input[type="text"], .ph-med-form-row textarea, .ph-med-form-row select { flex:1; padding:6px 8px; }
+        .ph-med-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+      </style>
+      <div class="ph-med-modal-backdrop"></div>
+      <div class="ph-med-modal-card" role="dialog" aria-modal="true">
+        <h3>Log medication for ${pet.name}</h3>
+        <div class="ph-med-form-row">
+          <label>Medication</label>
+          <div style="flex:1;">${med.medication_name}</div>
+        </div>
+        <div class="ph-med-form-row">
+          <label>When</label>
+          <input id="ph-med-ts" type="datetime-local" />
+        </div>
+        <div class="ph-med-form-row">
+          <label>Dosage</label>
+          <input id="ph-med-dosage" type="text" value="${med.dosage || ''}" />
+        </div>
+        <div class="ph-med-form-row">
+          <label>Unit</label>
+          <input id="ph-med-unit" type="text" value="${med.unit || ''}" />
+        </div>
+        <div class="ph-med-form-row">
+          <label>Notes</label>
+          <textarea id="ph-med-notes" rows="3" placeholder="Optional notes"></textarea>
+        </div>
+        <div class="ph-med-actions">
+          <button class="action-button ph-med-cancel">Cancel</button>
+          <button class="action-button ph-med-submit">Log medication</button>
+        </div>
+        <div class="ph-small" style="margin-top:8px;">Tip: set the time if logging a past dose, or leave as now</div>
+      </div>
+    `;
+
+    try { document.body.appendChild(modal); } catch (e) { this.appendChild(modal); }
+
+    const tsInput = modal.querySelector('#ph-med-ts');
+    const toLocalDateTime = (d) => {
+      const pad = (n) => String(n).padStart(2, '0');
+      const year = d.getFullYear();
+      const month = pad(d.getMonth() + 1);
+      const day = pad(d.getDate());
+      const hours = pad(d.getHours());
+      const mins = pad(d.getMinutes());
+      return `${year}-${month}-${day}T${hours}:${mins}`;
+    };
+    tsInput.value = toLocalDateTime(new Date());
+
+    modal.querySelector('.ph-med-cancel').addEventListener('click', () => this.closeDialog(modal));
+    modal.querySelector('.ph-med-submit').addEventListener('click', async () => {
+      const tsVal = modal.querySelector('#ph-med-ts').value;
+      const dosageVal = modal.querySelector('#ph-med-dosage').value.trim();
+      const unitVal = modal.querySelector('#ph-med-unit').value.trim();
+      const notes = modal.querySelector('#ph-med-notes').value || '';
+
+      if (!med.medication_id) {
+        alert('Medication is not configured with an ID; cannot log.');
+        return;
+      }
+
+      const payload = {
+        config_entry_id: pet.entry_id,
+        medication_id: med.medication_id,
+      };
+      if (dosageVal) payload.dosage = dosageVal;
+      if (unitVal) payload.unit = unitVal;
+      if (notes) payload.notes = notes;
+      if (tsVal) payload.given_at = new Date(tsVal).toISOString();
+
+      try {
+        await this.callService('log_medication', payload);
+        this.closeDialog(modal);
+        await this.loadMedications(pet.entry_id);
+      } catch (err) {
+        alert('Error logging medication: ' + err.message);
+      }
+    });
+  }
+
   // Format timestamp in European style: dd/mm/yyyy, 24h, no seconds
   formatTimestampEuropean(ts) {
     if (!ts) return 'N/A';
@@ -100,7 +193,7 @@ class PetHealthPanel extends HTMLElement {
         this._visits.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
         this._medications.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
       } catch (err) {
-        console.debug('Failed to load store dump:', err);
+        console.log('Failed to load store dump:', err);
         this._storeDump = {};
       }
       // Config entries loaded
@@ -508,7 +601,7 @@ class PetHealthPanel extends HTMLElement {
 
           <div class="stat-card">
             <h3>Last medication</h3>
-            <div class="stat-value">${lastMed ? formatTs(lastMed.timestamp) : 'N/A'}</div>
+            <div class="stat-value">${lastMed ? formatTs(lastMed.given_at || lastMed.given_time || lastMed.timestamp) : 'N/A'}</div>
             ${lastMed ? `<div class="stat-subtext">${lastMed.medication_name || ''}</div>` : ''}
           </div>
 
@@ -535,7 +628,6 @@ class PetHealthPanel extends HTMLElement {
           <h2>Quick actions</h2>
           <div class="action-buttons">
               <button class="action-button" data-action="log-bathroom">🚽 Log Bathroom Visit</button>
-              <button class="action-button" data-action="log-medication">💊 Log Medication</button>
               <button class="action-button" data-action="log-vomit">🤮 Log Vomit</button>
             </div>
         </div>
@@ -721,9 +813,28 @@ class PetHealthPanel extends HTMLElement {
       if (petId) {
         // Normalize confirmed flag for each visit and store under UI entry_id
         this._visitsByPet[petId] = (result.visits || []).map((v) => ({ ...v, confirmed: this._normalizeConfirmed(v.confirmed) }));
+
+        // Sort per-pet visits by logged_at (preferred) then timestamp, newest first
+        const toTs = (t) => {
+          if (!t) return 0;
+          try { const d = new Date(t); return Number.isNaN(d.getTime()) ? 0 : d.getTime(); } catch (e) { return 0; }
+        };
+        this._visitsByPet[petId].sort((a, b) => {
+          const ta = toTs(a.logged_at || a.timestamp);
+          const tb = toTs(b.logged_at || b.timestamp);
+          return tb - ta;
+        });
+
         this._visitsLoadedFor.add(petId);
       } else {
         this._visits = (result.visits || []).map((v) => ({ ...v, confirmed: this._normalizeConfirmed(v.confirmed) }));
+
+        // Sort global visits as well by logged_at then timestamp (newest first)
+        const toTsGlobal = (t) => {
+          if (!t) return 0;
+          try { const d = new Date(t); return Number.isNaN(d.getTime()) ? 0 : d.getTime(); } catch (e) { return 0; }
+        };
+        this._visits.sort((a, b) => toTsGlobal(b.logged_at || b.timestamp) - toTsGlobal(a.logged_at || a.timestamp));
       }
 
     } catch (err) {
@@ -752,8 +863,19 @@ class PetHealthPanel extends HTMLElement {
     this._loadingMedications = true;
 
     try {
-      const payload = petId ? { type: 'pet_health/get_medications', pet_id: petId } : { type: 'pet_health/get_medications' };
+      // If a UI `entry_id` was passed in, map it to the internal pet id expected
+      // by the backend websocket command. This mirrors the mapping used by
+      // `loadVisits` and ensures that calling `loadMedications(pet.entry_id)`
+      // returns data for the correct pet.
+      let wsPetId = petId;
+      if (petId) {
+        const maybeInternal = this.getPetIdFromEntry(petId);
+        if (maybeInternal) wsPetId = maybeInternal;
+      }
+
+      const payload = wsPetId ? { type: 'pet_health/get_medications', pet_id: wsPetId } : { type: 'pet_health/get_medications' };
       const result = await this.hass.callWS(payload);
+      console.log('pet-health: loadMedications result', { petId, wsPetId, result });
 
       this._medications = result.medications || [];
       if (petId) this._medicationsLoadedFor.add(petId);
@@ -797,7 +919,9 @@ class PetHealthPanel extends HTMLElement {
         attrs.medications.forEach((m) =>
           medsFromSensors.push({
             medication_name: m.medication_name || m.name || m.medication || '',
-            timestamp: m.timestamp || m.given_at || sensor.last_changed || new Date().toISOString(),
+            timestamp: m.timestamp || sensor.last_changed || new Date().toISOString(),
+            given_at: m.given_at || m.given_time || m.givenAt || null,
+            medication_id: m.medication_id || m.med_id || m.id || attrs.medication_id || null,
             dosage: m.dosage || m.amount || '',
             unit: m.unit || '',
             notes: m.notes || m.note || '',
@@ -811,7 +935,9 @@ class PetHealthPanel extends HTMLElement {
         attrs.medication_records.forEach((m) =>
           medsFromSensors.push({
             medication_name: m.medication_name || m.name || '',
-            timestamp: m.timestamp || m.given_at || sensor.last_changed || new Date().toISOString(),
+            timestamp: m.timestamp || sensor.last_changed || new Date().toISOString(),
+            given_at: m.given_at || m.given_time || m.givenAt || null,
+            medication_id: m.medication_id || m.med_id || m.id || attrs.medication_id || null,
             dosage: m.dosage || '',
             unit: m.unit || '',
             notes: m.notes || '',
@@ -823,9 +949,32 @@ class PetHealthPanel extends HTMLElement {
 
       // If sensor represents a single last-medication event, try to build a record
       if (sensor.state && sensor.state !== 'unknown' && sensor.state !== 'unavailable') {
+        // Detect if the sensor.state appears to be an ISO timestamp
+        const looksLikeIso = (s) => {
+          if (!s || typeof s !== 'string') return false;
+          // Quick check for ISO-like format (YYYY-)
+          if (!/^\d{4}-\d{2}-\d{2}T\d{2}:/.test(s)) return false;
+          try {
+            const d = new Date(s);
+            return !Number.isNaN(d.getTime());
+          } catch (e) {
+            return false;
+          }
+        };
+
+        let givenAt = attrs.given_at || attrs.given_time || attrs.givenAt || null;
+        if (!givenAt && looksLikeIso(sensor.state)) {
+          givenAt = sensor.state;
+        }
+
+        const medNameFallback = attrs.medication_name || attrs.name || key;
+        const medicationName = looksLikeIso(sensor.state) ? medNameFallback : (attrs.medication_name || sensor.state || key);
+
         medsFromSensors.push({
-          medication_name: attrs.medication_name || sensor.state || key,
-          timestamp: attrs.given_at || sensor.last_changed || new Date().toISOString(),
+          medication_name: medicationName,
+          timestamp: sensor.last_changed || new Date().toISOString(),
+          given_at: givenAt,
+          medication_id: attrs.medication_id || null,
           dosage: attrs.dosage || '',
           unit: attrs.unit || '',
           notes: attrs.notes || '',
@@ -833,6 +982,14 @@ class PetHealthPanel extends HTMLElement {
         });
       }
     });
+
+    // Debug: sensors detected and sensor-derived meds
+    try {
+      const sensorKeys = medSensorEntries.map(([k]) => k);
+      console.log('pet-health: renderMedications start', { petEntryId: pet.entry_id, sensorKeys, medsFromSensorsCount: medsFromSensors.length });
+    } catch (e) {
+      console.log('pet-health: renderMedications debug failed', e);
+    }
 
     // Get store-provided meds either from loaded _medications or from the config entry payload
     let storeMeds = [];
@@ -843,7 +1000,9 @@ class PetHealthPanel extends HTMLElement {
       const pd = this._storeDump[petInternalId] || this._storeDump[pet.entry_id] || {};
       storeMeds = (pd.medications || []).map((m) => ({
         medication_name: m.medication_name || m.name || m.medication || '',
-        timestamp: m.timestamp || m.given_at || new Date().toISOString(),
+        timestamp: m.timestamp || new Date().toISOString(),
+        given_at: m.given_at || m.given_time || m.givenAt || null,
+        medication_id: m.medication_id || m.med_id || m.id || null,
         dosage: m.dosage || m.amount || '',
         unit: m.unit || '',
         notes: m.notes || '',
@@ -854,7 +1013,8 @@ class PetHealthPanel extends HTMLElement {
     } else if (configEntry && Array.isArray(configEntry.medications) && configEntry.medications.length > 0) {
       storeMeds = configEntry.medications.map((m) => ({
         medication_name: m.medication_name || m.name || m.medication || '',
-        timestamp: m.timestamp || m.given_at || new Date().toISOString(),
+        timestamp: m.timestamp || new Date().toISOString(),
+        given_at: m.given_at || m.given_time || m.givenAt || null,
         dosage: m.dosage || m.amount || '',
         unit: m.unit || '',
         notes: m.notes || '',
@@ -863,8 +1023,10 @@ class PetHealthPanel extends HTMLElement {
     }
 
     // Merge: prefer storeMeds, then append sensor meds that are not duplicates
-    const merged = [...storeMeds];
-    const seen = new Set(storeMeds.map((s) => `${s.medication_name}::${s.timestamp}`));
+    // Mark store records so we don't filter them out as "duplicates" of themselves
+    const merged = storeMeds.map((s) => ({ ...s, _fromStore: true }));
+    // Use timestamp or given_at/given_time as the dedupe time key
+    const seen = new Set(storeMeds.map((s) => `${(s.medication_name || '').trim()}::${s.timestamp || s.given_at || s.given_time || ''}`));
     medsFromSensors.forEach((s) => {
       const key = `${s.medication_name}::${s.timestamp}`;
       if (!seen.has(key)) {
@@ -872,6 +1034,8 @@ class PetHealthPanel extends HTMLElement {
         seen.add(key);
       }
     });
+
+    console.log('pet-health: merged medications', { petEntryId: pet.entry_id, mergedCount: merged.length, mergedSample: merged.slice(0,5) });
 
     // Filter out likely false-positive records that come from noisy sensors
     // or malformed data (e.g. numeric-only names like "0" or invalid timestamps).
@@ -888,10 +1052,11 @@ class PetHealthPanel extends HTMLElement {
 
     const TOLERANCE_MS = 2 * 60 * 1000; // 2 minutes
 
-    // Build a list of authoritative store timestamps for dedupe
+    // Build a list of authoritative store timestamps for dedupe. Use given_at as
+    // a fallback when timestamp is not present (some backends only set given_at).
     const storeKeys = (storeMeds || []).map((s) => ({
       name: String(s.medication_name || '').trim(),
-      ts: parseTs(s.timestamp),
+      ts: parseTs(s.timestamp || s.given_at || s.given_time),
     })).filter((s) => s.name && s.ts !== null);
 
     const filtered = merged.filter((m) => {
@@ -899,8 +1064,12 @@ class PetHealthPanel extends HTMLElement {
       if (!name) return false;
       // Exclude purely numeric names (commonly produced by sensors with state '0')
       if (/^\d+$/.test(name)) return false;
-      const ts = parseTs(m.timestamp);
+      // Accept timestamp from record or fallback to given_at/given_time
+      const ts = parseTs(m.timestamp || m.given_at || m.given_time);
       if (ts === null) return false;
+
+      // Store records are always kept; only check sensor-derived records for duplicates
+      if (m._fromStore) return true;
 
       // If this record is sensor-derived and there's a store record with the same
       // medication name within the tolerance, treat as duplicate
@@ -911,6 +1080,14 @@ class PetHealthPanel extends HTMLElement {
     });
 
     const meds = filtered;
+    console.log('pet-health: filtered medications', { petEntryId: pet.entry_id, filteredCount: meds.length, sample: meds.slice(0,5) });
+
+    // Sort meds by given time when available, otherwise by record timestamp (newest first)
+    meds.sort((a, b) => {
+      const ta = parseTs(a.given_at || a.given_time || a.timestamp) || 0;
+      const tb = parseTs(b.given_at || b.given_time || b.timestamp) || 0;
+      return tb - ta;
+    });
 
     const medsKey = `medications:${pet.entry_id}`;
     const medsExpanded = !!this._expandedSections[medsKey];
@@ -919,11 +1096,80 @@ class PetHealthPanel extends HTMLElement {
     return `
       <div class="content-area">
         <h2>Medications for ${pet.name}</h2>
+
+        ${(() => {
+          // Build list of registered medications keyed by normalized name.
+          // Prefer entries that include a medication_id over ones that don't.
+          const regMap = new Map();
+          const addEntry = (entry) => {
+            const name = String(entry.medication_name || '').trim();
+            if (!name) return;
+            const key = name.toLowerCase();
+            const existing = regMap.get(key);
+            if (!existing) {
+              regMap.set(key, entry);
+              return;
+            }
+            // Prefer entry with medication_id
+            if (!existing.medication_id && entry.medication_id) {
+              regMap.set(key, entry);
+            }
+          };
+
+          // From config entry
+          if (configEntry && Array.isArray(configEntry.medications)) {
+            configEntry.medications.forEach((m) => {
+              addEntry({ medication_name: (m.medication_name || m.name || '').trim(), dosage: m.dosage || m.amount || '', unit: m.unit || '', medication_id: m.medication_id || null });
+            });
+          }
+
+          // From storeMeds definitions
+          (storeMeds || []).forEach((m) => {
+            addEntry({ medication_name: (m.medication_name || m.name || '').trim(), dosage: m.dosage || m.amount || '', unit: m.unit || '', medication_id: m.medication_id || null });
+          });
+
+          // Also include sensor-derived medications that include an ID (prefer these)
+          (medsFromSensors || []).forEach((m) => {
+            if (!m.medication_id) return;
+            addEntry({ medication_name: (m.medication_name || '').trim(), dosage: m.dosage || '', unit: m.unit || '', medication_id: m.medication_id || null });
+          });
+
+          const reg = Array.from(regMap.values());
+          if (reg.length === 0) return '';
+
+          return `
+            <div style="margin-bottom:16px;">
+              <h3>Registered medications</h3>
+              <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; background: var(--card-background-color); margin-bottom:8px;">
+                  <thead>
+                    <tr style="border-bottom:2px solid var(--divider-color); text-align:left;">
+                      <th style="padding:12px;">Medication</th>
+                      <th style="padding:12px;">ID</th>
+                      <th style="padding:12px;">Default dose</th>
+                      <th style="padding:12px;">Unit</th>
+                      <th style="padding:12px; text-align:center;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${reg.map(r => `
+                      <tr>
+                        <td style="padding:8px;">${r.medication_name}</td>
+                        <td style="padding:8px; font-family: monospace;">${r.medication_id || '—'}</td>
+                        <td style="padding:8px;">${r.dosage || '—'}</td>
+                        <td style="padding:8px;">${r.unit || '—'}</td>
+                        <td style="padding:8px; text-align:center;"><button class="action-button log-registered-med" data-med-id="${r.medication_id || ''}" data-med-name="${r.medication_name}" data-dosage="${r.dosage}" data-unit="${r.unit}">Log</button></td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `;
+        })()}
         ${this.renderMedicationsTable(medsShown)}
         ${meds.length > 5 ? `<div style="margin-top:8px"><button class="show-more-btn" data-section="medications" data-pet="${pet.entry_id}">${medsExpanded ? 'Show less' : 'Show more'}</button></div>` : ''}
-        <div style="margin-top:16px;">
-          <button class="action-button" data-action="log-medication">💊 Log Medication</button>
-        </div>
+        <!-- Removed legacy quick Log Medication button; use Registered medications table above -->
       </div>
     `;
   }
@@ -935,13 +1181,16 @@ class PetHealthPanel extends HTMLElement {
 
     const rows = meds
       .map(
-        (m) => `
+        (m) => {
+          const displayTs = m.given_at || m.given_time || m.timestamp || null;
+          return `
       <tr>
         <td style="padding: 8px;">${m.medication_name}</td>
-        <td style="padding: 8px;">${this.formatTimestampEuropean(m.timestamp)}</td>
+        <td style="padding: 8px;">${this.formatTimestampEuropean(displayTs)}</td>
         <td style="padding: 8px;">${m.dosage || ''} ${m.unit || ''}</td>
         <td style="padding: 8px;">${m.notes || ''}</td>
       </tr>`
+        }
       )
       .join('');
 
@@ -1317,6 +1566,24 @@ class PetHealthPanel extends HTMLElement {
         this.handleAction(button.dataset.action);
       });
     });
+
+    // Registered medication quick-log buttons
+    this.querySelectorAll('.log-registered-med').forEach(button => {
+      button.addEventListener('click', async () => {
+        const pet = this.getSelectedPet();
+        if (!pet) return;
+        const medId = button.dataset.medId;
+        const name = button.dataset.medName;
+        const dosage = button.dataset.dosage;
+        const unit = button.dataset.unit;
+        if (!medId) {
+          alert('Medication not configured with an ID. Open integration settings to configure this medication before logging.');
+          return;
+        }
+        // Open modal to allow time/dose adjustments similar to bathroom visit modal
+        this.showLogMedicationDialog(pet, { medication_id: medId, medication_name: name, dosage, unit });
+      });
+    });
   }
 
   handleAction(action) {
@@ -1326,25 +1593,19 @@ class PetHealthPanel extends HTMLElement {
     // For now, just call the service - we can add dialogs later
     switch (action) {
       case 'log-bathroom':
-        this.callService('log_bathroom_visit', {
-          config_entry_id: pet.entry_id,
-          did_pee: true,
-          did_poop: false
-        });
+        this.showLogBathroomDialog(pet);
+        break;
+
         break;
       case 'log-medication':
         {
           const name = prompt('Medication name:');
           if (!name) return;
-          const dosage = prompt('Dosage (number, optional):');
-          const unit = prompt('Unit (e.g. mg, ml, g) (optional):');
           const notes = prompt('Notes (optional):');
           const payload = {
             config_entry_id: pet.entry_id,
             medication_name: name,
           };
-          if (dosage) payload.dosage = isNaN(parseFloat(dosage)) ? dosage : parseFloat(dosage);
-          if (unit) payload.unit = unit;
           if (notes) payload.notes = notes;
           this.callService('log_medication', payload);
         }
@@ -1499,6 +1760,154 @@ class PetHealthPanel extends HTMLElement {
       })
       .catch(err => alert('❌ Error: ' + err.message));
   }
+
+    showLogBathroomDialog(pet) {
+      // Remove existing dialog if present
+      const existing = this.querySelector('.ph-modal');
+      if (existing) existing.remove();
+
+      const modal = document.createElement('div');
+      modal.className = 'ph-modal';
+      modal.innerHTML = `
+        <style>
+          .ph-modal { position: fixed; inset: 0; display:flex; align-items:center; justify-content:center; z-index:10000; }
+          .ph-modal-backdrop { position:absolute; inset:0; background: rgba(0,0,0,0.45); }
+          .ph-modal-card { position:relative; background: var(--card-background-color); color: var(--primary-text-color); border-radius:8px; padding:20px; width:520px; box-shadow: var(--ha-card-box-shadow); z-index:10001; }
+          .ph-modal-card h3 { margin:0 0 8px 0; }
+          .ph-form-row { display:flex; gap:8px; margin-bottom:8px; align-items:center; }
+          .ph-form-row > label { min-width:120px; font-size:13px; color:var(--secondary-text-color); }
+          .ph-form-row input[type="text"], .ph-form-row textarea, .ph-form-row select { flex:1; padding:6px 8px; }
+          .ph-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+          .ph-checkbox-group { display:flex; gap:8px; align-items:center; }
+          .ph-small { font-size:12px; color:var(--secondary-text-color); }
+        </style>
+        <div class="ph-modal-backdrop"></div>
+        <div class="ph-modal-card" role="dialog" aria-modal="true">
+          <h3>Log bathroom visit for ${pet.name}</h3>
+          <div class="ph-form-row">
+            <label>When</label>
+            <input id="ph-ts" type="datetime-local" />
+          </div>
+          <div class="ph-form-row">
+            <label></label>
+            <div class="ph-checkbox-group">
+              <label><input id="ph-peeing" type="checkbox" checked /> Pee</label>
+              <label><input id="ph-pooping" type="checkbox" /> Poop</label>
+            </div>
+          </div>
+          <div class="ph-form-row" id="ph-poop-details" style="display:none;">
+            <label>Poop details</label>
+            <div style="flex:1; display:flex; gap:8px;">
+              <select id="ph-poop-consistency" multiple style="min-width:140px;">
+                <option value="normal">Normal</option>
+                <option value="soft">Soft</option>
+                <option value="hard">Hard</option>
+                <option value="diarrhea">Diarrhea</option>
+                <option value="liquid">Liquid</option>
+              </select>
+              <select id="ph-poop-color">
+                <option value="">Color (optional)</option>
+                <option value="brown">Brown</option>
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+                <option value="yellow">Yellow</option>
+                <option value="green">Green</option>
+                <option value="red">Red</option>
+                <option value="black">Black</option>
+              </select>
+            </div>
+          </div>
+          <div class="ph-form-row">
+            <label>Urine amount</label>
+            <select id="ph-urine-amount">
+              <option value="">(unspecified)</option>
+              <option value="small">Small</option>
+              <option value="normal">Normal</option>
+              <option value="large">Large</option>
+            </select>
+          </div>
+          <div class="ph-form-row">
+            <label>Notes</label>
+            <textarea id="ph-notes" rows="3" placeholder="Optional notes (e.g., unusual behavior)"></textarea>
+          </div>
+
+          <div class="ph-actions">
+            <button class="action-button ph-cancel">Cancel</button>
+            <button class="action-button ph-submit">Log visit</button>
+          </div>
+          <div class="ph-small" style="margin-top:8px;">Tip: set the time if logging a past visit, or leave as now</div>
+        </div>
+      `;
+
+      // Append to document.body so re-renders of the panel don't remove it
+      try {
+        document.body.appendChild(modal);
+      } catch (e) {
+        // Fallback to appending to the panel element
+        this.appendChild(modal);
+      }
+
+      console.log('pet-health: showLogBathroomDialog for', pet.entry_id);
+
+      // Set default ts to now in local datetime-local format
+      const tsInput = modal.querySelector('#ph-ts');
+      const toLocalDateTime = (d) => {
+        const pad = (n) => String(n).padStart(2, '0');
+        const year = d.getFullYear();
+        const month = pad(d.getMonth() + 1);
+        const day = pad(d.getDate());
+        const hours = pad(d.getHours());
+        const mins = pad(d.getMinutes());
+        return `${year}-${month}-${day}T${hours}:${mins}`;
+      };
+      tsInput.value = toLocalDateTime(new Date());
+
+      const pee = modal.querySelector('#ph-peeing');
+      const poop = modal.querySelector('#ph-pooping');
+      const poopDetails = modal.querySelector('#ph-poop-details');
+      pee.addEventListener('change', () => {});
+      poop.addEventListener('change', () => {
+        poopDetails.style.display = poop.checked ? 'flex' : 'none';
+      });
+
+      modal.querySelector('.ph-cancel').addEventListener('click', () => this.closeDialog(modal));
+      modal.querySelector('.ph-submit').addEventListener('click', async () => {
+        const tsVal = modal.querySelector('#ph-ts').value;
+        const didPee = modal.querySelector('#ph-peeing').checked;
+        const didPoop = modal.querySelector('#ph-pooping').checked;
+        const poopCons = Array.from(modal.querySelector('#ph-poop-consistency').selectedOptions).map(o => o.value);
+        const poopColor = modal.querySelector('#ph-poop-color').value || null;
+        const urineAmt = modal.querySelector('#ph-urine-amount').value || null;
+        const notes = modal.querySelector('#ph-notes').value || '';
+
+        const payload = {
+          config_entry_id: pet.entry_id,
+          did_pee: !!didPee,
+          did_poop: !!didPoop,
+          notes: notes || undefined,
+        };
+        // logged_at: convert local datetime-local to ISO (service expects `logged_at`)
+        if (tsVal) {
+          const iso = new Date(tsVal).toISOString();
+          payload.logged_at = iso;
+        }
+        if (poopCons && poopCons.length > 0) payload.poop_consistencies = poopCons;
+        if (poopColor) payload.poop_color = poopColor;
+        if (urineAmt) payload.urine_amount = urineAmt;
+
+        try {
+          await this.callService('log_bathroom_visit', payload);
+          this.closeDialog(modal);
+          await this.loadVisits(pet.entry_id);
+        } catch (err) {
+          alert('Error logging visit: ' + err.message);
+        }
+      });
+    }
+
+    closeDialog(modal) {
+      if (modal && modal.remove) modal.remove();
+    }
 
   async callService(service, data) {
     try {
