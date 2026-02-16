@@ -196,6 +196,7 @@ class PetHealthOptionsFlow(OptionsFlow):
                     )
                 }
             ),
+            description_placeholders={"pet_name": self.config_entry.title},
         )
 
     async def async_step_add_medication(

@@ -15,6 +15,9 @@ class PetHealthPanel extends HTMLElement {
     this._loadingVisits = false;
     this._medications = [];
     this._loadingMedications = false;
+    this._medicationsLoadedFor = new Set();
+    this._visitsLoadedFor = new Set();
+    this._visitsByPet = {};
     this._editingVisitId = null;
     this._medicationsRetries = 0;
     this._storeDump = {};
@@ -85,7 +88,11 @@ class PetHealthPanel extends HTMLElement {
         this._medications = [];
         Object.keys(this._storeDump).forEach((pid) => {
           const pd = this._storeDump[pid] || {};
-          (pd.visits || []).forEach((v) => this._visits.push(v));
+          (pd.visits || []).forEach((v) => {
+            const nv = Object.assign({}, v);
+            nv.confirmed = this._normalizeConfirmed(nv.confirmed);
+            this._visits.push(nv);
+          });
           (pd.medications || []).forEach((m) => this._medications.push(m));
         });
 
@@ -102,6 +109,19 @@ class PetHealthPanel extends HTMLElement {
       if (!this._selectedPetId && this._configEntries.length > 0) {
         this._selectedPetId = this._configEntries[0].entry_id;
       }
+          // Determine whether selected pet has medications to show/hide tab
+          const selectedPet = this.getSelectedPet();
+          let hasMedications = false;
+          if (selectedPet) {
+            const selInternal = this.getPetIdFromEntry(selectedPet.entry_id);
+            const pd = (this._storeDump && (this._storeDump[selInternal] || this._storeDump[selectedPet.entry_id]))
+              ? (this._storeDump[selInternal] || this._storeDump[selectedPet.entry_id])
+              : {};
+            const configEntry = this._configEntries.find((e) => e.entry_id === selectedPet.entry_id);
+            hasMedications = (pd.medications && pd.medications.length > 0) ||
+              (this._medications && this._medications.some((m) => m.pet_id === selectedPet.entry_id || m.pet_id === selInternal)) ||
+              (configEntry && Array.isArray(configEntry.medications) && configEntry.medications.length > 0);
+          }
     } catch (err) {
       console.error('Failed to load pet config entries:', err);
       this._configEntries = [];
@@ -154,6 +174,19 @@ class PetHealthPanel extends HTMLElement {
     if (selectedPet) {
       const selInternal = this.getPetIdFromEntry(selectedPet.entry_id);
       unconfirmedCount = this._visits.filter(v => v.pet_id === selectedPet.entry_id || v.pet_id === selInternal).filter(v => !v.confirmed).length;
+    }
+
+    // Determine whether selected pet has medications to show/hide tab
+    let hasMedications = false;
+    if (selectedPet) {
+      const selInternal = this.getPetIdFromEntry(selectedPet.entry_id);
+      const pd = (this._storeDump && (this._storeDump[selInternal] || this._storeDump[selectedPet.entry_id]))
+        ? (this._storeDump[selInternal] || this._storeDump[selectedPet.entry_id])
+        : {};
+      const configEntry = this._configEntries.find((e) => e.entry_id === selectedPet.entry_id);
+      hasMedications = (pd.medications && pd.medications.length > 0) ||
+        (this._medications && this._medications.some((m) => m.pet_id === selectedPet.entry_id || m.pet_id === selInternal)) ||
+        (configEntry && Array.isArray(configEntry.medications) && configEntry.medications.length > 0);
     }
 
     this.innerHTML = `
@@ -377,14 +410,20 @@ class PetHealthPanel extends HTMLElement {
     const pet = this.getSelectedPet();
     if (!pet) return '<div class="empty-state">Pet not found</div>';
 
-    // Load visits when switching to visits view
-    if (this._currentView === 'visits' && this._visits.length === 0 && !this._loadingVisits) {
-      this.loadVisits();
+    // Load visits when switching to visits view (per-pet)
+    if (this._currentView === 'visits' && !this._loadingVisits) {
+      const selPet = this.getSelectedPet();
+      if (selPet && !this._visitsLoadedFor.has(selPet.entry_id)) {
+        this.loadVisits(selPet.entry_id);
+      }
     }
 
-    // Load medications when switching to medications view
-    if (this._currentView === 'medications' && this._medications.length === 0 && !this._loadingMedications) {
-      this.loadMedications();
+    // Load medications when switching to medications view (per-pet)
+    if (this._currentView === 'medications' && !this._loadingMedications) {
+      const selPet = this.getSelectedPet();
+      if (selPet && !this._medicationsLoadedFor.has(selPet.entry_id)) {
+        this.loadMedications(selPet.entry_id);
+      }
     }
 
     switch (this._currentView) {
@@ -516,7 +555,10 @@ class PetHealthPanel extends HTMLElement {
 
     // Filter visits for this pet
     const petInternalId = this.getPetIdFromEntry(pet.entry_id);
-    const petVisits = this._visits.filter(
+    // Prefer per-pet cached visits if available (loaded via loadVisits with pet_id),
+    // otherwise fall back to the global visits array (store dump)
+    const sourceVisits = this._visitsByPet[pet.entry_id] || this._visits;
+    const petVisits = sourceVisits.filter(
       (v) => v.pet_id === pet.entry_id || v.pet_id === petInternalId
     );
 
@@ -641,20 +683,57 @@ class PetHealthPanel extends HTMLElement {
     return entry?.data?.pet_id ?? entry?.pet_id;
   }
 
+  _normalizeConfirmed(val) {
+    // Accept multiple shapes for the "confirmed" flag (boolean, string, number)
+    if (val === true) return true;
+    if (val === 'true') return true;
+    if (val === 1) return true;
+    if (val === '1') return true;
+    return false;
+  }
+
   async loadVisits() {
+    // Accept optional pet id so we only attempt to load visits for a specific pet
+    const args = Array.from(arguments);
+    const petId = args[0] || null;
+
     if (this._loadingVisits) return;
+    if (petId && this._visitsLoadedFor.has(petId)) return;
+
     this._loadingVisits = true;
 
     try {
-      const result = await this.hass.callWS({
-        type: 'pet_health/get_visits'
-      });
+      // The frontend uses config entry IDs as keys, but the backend websocket
+      // commands expect the internal pet id. If a UI entry_id was provided,
+      // map it to the internal id for the WS call but keep storing the results
+      // under the UI entry_id so the rest of the UI (which keys by entry_id)
+      // continues to work.
+      let wsPetId = petId;
+      if (petId) {
+        // If petId looks like a UI entry_id, try to map to internal pet id
+        const maybeInternal = this.getPetIdFromEntry(petId);
+        if (maybeInternal) wsPetId = maybeInternal;
+      }
 
-      this._visits = result.visits || [];
+      const payload = wsPetId ? { type: 'pet_health/get_visits', pet_id: wsPetId } : { type: 'pet_health/get_visits' };
+      const result = await this.hass.callWS(payload);
+
+      if (petId) {
+        // Normalize confirmed flag for each visit and store under UI entry_id
+        this._visitsByPet[petId] = (result.visits || []).map((v) => ({ ...v, confirmed: this._normalizeConfirmed(v.confirmed) }));
+        this._visitsLoadedFor.add(petId);
+      } else {
+        this._visits = (result.visits || []).map((v) => ({ ...v, confirmed: this._normalizeConfirmed(v.confirmed) }));
+      }
 
     } catch (err) {
       console.error('Failed to load visits:', err);
-      this._visits = [];
+      if (petId) {
+        this._visitsByPet[petId] = [];
+        this._visitsLoadedFor.add(petId);
+      } else {
+        this._visits = [];
+      }
     } finally {
       this._loadingVisits = false;
       this.render();
@@ -662,15 +741,22 @@ class PetHealthPanel extends HTMLElement {
   }
 
   async loadMedications() {
+    // Accept optional pet id to load meds for a single pet and avoid repeated reloads
+    const args = Array.from(arguments);
+    const petId = args[0] || null;
+
     if (this._loadingMedications) return;
+    // If we've already attempted to load medications for this pet, skip
+    if (petId && this._medicationsLoadedFor.has(petId)) return;
+
     this._loadingMedications = true;
 
     try {
-      const result = await this.hass.callWS({
-        type: 'pet_health/get_medications'
-      });
+      const payload = petId ? { type: 'pet_health/get_medications', pet_id: petId } : { type: 'pet_health/get_medications' };
+      const result = await this.hass.callWS(payload);
 
       this._medications = result.medications || [];
+      if (petId) this._medicationsLoadedFor.add(petId);
     } catch (err) {
       // If the backend hasn't registered the websocket command yet, retry a few times
       if (err && err.code === 'unknown_command' && this._medicationsRetries < 5) {
@@ -678,13 +764,14 @@ class PetHealthPanel extends HTMLElement {
         const retryDelay = 300 * this._medicationsRetries; // ms
         setTimeout(() => {
           this._loadingMedications = false;
-          this.loadMedications();
+          this.loadMedications(petId);
         }, retryDelay);
         return;
       }
 
       console.error('Failed to load medications:', err);
       this._medications = [];
+      if (petId) this._medicationsLoadedFor.add(petId);
     } finally {
       this._loadingMedications = false;
       this.render();
@@ -786,7 +873,44 @@ class PetHealthPanel extends HTMLElement {
       }
     });
 
-    const meds = merged;
+    // Filter out likely false-positive records that come from noisy sensors
+    // or malformed data (e.g. numeric-only names like "0" or invalid timestamps).
+    // Also de-duplicate sensor-derived records against store records using a
+    // small time tolerance (2 minutes) to avoid showing the same dose twice.
+    const parseTs = (ts) => {
+      try {
+        const d = new Date(ts);
+        return Number.isNaN(d.getTime()) ? null : d.getTime();
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const TOLERANCE_MS = 2 * 60 * 1000; // 2 minutes
+
+    // Build a list of authoritative store timestamps for dedupe
+    const storeKeys = (storeMeds || []).map((s) => ({
+      name: String(s.medication_name || '').trim(),
+      ts: parseTs(s.timestamp),
+    })).filter((s) => s.name && s.ts !== null);
+
+    const filtered = merged.filter((m) => {
+      const name = String(m.medication_name ?? '').trim();
+      if (!name) return false;
+      // Exclude purely numeric names (commonly produced by sensors with state '0')
+      if (/^\d+$/.test(name)) return false;
+      const ts = parseTs(m.timestamp);
+      if (ts === null) return false;
+
+      // If this record is sensor-derived and there's a store record with the same
+      // medication name within the tolerance, treat as duplicate
+      const isDuplicate = storeKeys.some((sk) => sk.name === name && Math.abs(sk.ts - ts) <= TOLERANCE_MS);
+      if (isDuplicate) return false;
+
+      return true;
+    });
+
+    const meds = filtered;
 
     const medsKey = `medications:${pet.entry_id}`;
     const medsExpanded = !!this._expandedSections[medsKey];
@@ -806,7 +930,7 @@ class PetHealthPanel extends HTMLElement {
 
   renderMedicationsTable(meds) {
     if (!meds || meds.length === 0) {
-      return `<p>No medication records found</p>`;
+      return `<p>No medication records found. To add medications for this pet open Home Assistant > Settings > Devices & Services, find the pet's integration entry, and configure medications for the pet.</p>`;
     }
 
     const rows = meds
@@ -1161,17 +1285,17 @@ class PetHealthPanel extends HTMLElement {
 
     // Navigation buttons
     this.querySelectorAll('.nav-button').forEach(button => {
-      button.addEventListener('click', (e) => {
-        this._currentView = e.target.dataset.view;
+      button.addEventListener('click', () => {
+        this._currentView = button.dataset.view;
         this.render();
       });
     });
 
     // Show more/less buttons
     this.querySelectorAll('.show-more-btn').forEach(button => {
-      button.addEventListener('click', (e) => {
-        const section = e.target.dataset.section;
-        const petId = e.target.dataset.pet;
+      button.addEventListener('click', () => {
+        const section = button.dataset.section;
+        const petId = button.dataset.pet;
         const key = `${section}:${petId}`;
         this._expandedSections[key] = !this._expandedSections[key];
         this.render();
@@ -1182,15 +1306,15 @@ class PetHealthPanel extends HTMLElement {
 
     // Visit action buttons
     this.querySelectorAll('.visit-action-btn').forEach(button => {
-      button.addEventListener('click', (e) => {
-        const action = e.target.dataset.action;
-        const visitId = e.target.dataset.visitId;
+      button.addEventListener('click', () => {
+        const action = button.dataset.action;
+        const visitId = button.dataset.visitId;
         this.handleVisitAction(action, visitId);
       });
     });
     this.querySelectorAll('.action-button').forEach(button => {
-      button.addEventListener('click', (e) => {
-        this.handleAction(e.target.dataset.action);
+      button.addEventListener('click', () => {
+        this.handleAction(button.dataset.action);
       });
     });
   }
