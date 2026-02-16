@@ -13,7 +13,30 @@ class PetHealthPanel extends HTMLElement {
     this._loadingEntries = false;
     this._visits = [];
     this._loadingVisits = false;
+    this._medications = [];
+    this._loadingMedications = false;
     this._editingVisitId = null;
+    this._medicationsRetries = 0;
+    this._storeDump = {};
+    this._expandedSections = {};
+  }
+
+  // Format timestamp in European style: dd/mm/yyyy, 24h, no seconds
+  formatTimestampEuropean(ts) {
+    if (!ts) return 'N/A';
+    try {
+      const d = new Date(ts);
+      return d.toLocaleString('sv-SE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).replace(',', '');
+    } catch (e) {
+      return ts;
+    }
   }
 
   set hass(hass) {
@@ -52,11 +75,28 @@ class PetHealthPanel extends HTMLElement {
 
       this._configEntries = result.entries || [];
 
-      // Debug: Log config entry structure
-      console.log('Config entries loaded:', this._configEntries.length);
-      if (this._configEntries.length > 0) {
-        console.log('First entry structure:', JSON.stringify(this._configEntries[0], null, 2));
+      // After loading entries, fetch authoritative store dump (all pets)
+      try {
+        const dump = await this.hass.callWS({ type: 'pet_health/get_store_dump' });
+        this._storeDump = dump.data || {};
+
+        // Flatten visits/medications for quick access as legacy arrays
+        this._visits = [];
+        this._medications = [];
+        Object.keys(this._storeDump).forEach((pid) => {
+          const pd = this._storeDump[pid] || {};
+          (pd.visits || []).forEach((v) => this._visits.push(v));
+          (pd.medications || []).forEach((m) => this._medications.push(m));
+        });
+
+        // Sort descending by timestamp
+        this._visits.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+        this._medications.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+      } catch (err) {
+        console.debug('Failed to load store dump:', err);
+        this._storeDump = {};
       }
+      // Config entries loaded
 
       // Select first pet if none selected
       if (!this._selectedPetId && this._configEntries.length > 0) {
@@ -106,6 +146,14 @@ class PetHealthPanel extends HTMLElement {
     // If no pet selected, select the first one
     if (!this._selectedPetId && pets.length > 0) {
       this._selectedPetId = pets[0].entry_id;
+    }
+
+    // Compute unconfirmed visits count for selected pet (for badge)
+    const selectedPet = this.getSelectedPet();
+    let unconfirmedCount = 0;
+    if (selectedPet) {
+      const selInternal = this.getPetIdFromEntry(selectedPet.entry_id);
+      unconfirmedCount = this._visits.filter(v => v.pet_id === selectedPet.entry_id || v.pet_id === selInternal).filter(v => !v.confirmed).length;
     }
 
     this.innerHTML = `
@@ -265,6 +313,18 @@ class PetHealthPanel extends HTMLElement {
           margin-bottom: 16px;
           opacity: 0.5;
         }
+        .badge {
+          display: inline-block;
+          min-width: 20px;
+          padding: 2px 6px;
+          margin-left: 8px;
+          font-size: 12px;
+          line-height: 16px;
+          color: var(--text-primary-color);
+          background: var(--primary-color);
+          border-radius: 12px;
+          text-align: center;
+        }
       </style>
 
       <div class="pet-health-container">
@@ -291,10 +351,13 @@ class PetHealthPanel extends HTMLElement {
                 📊 Dashboard
               </button>
               <button class="nav-button ${this._currentView === 'visits' ? 'active' : ''}" data-view="visits">
-                🚽 Bathroom Visits
+                🚽 Bathroom Visits ${unconfirmedCount > 0 ? `<span class="badge">${unconfirmedCount}</span>` : ''}
               </button>
               <button class="nav-button ${this._currentView === 'medications' ? 'active' : ''}" data-view="medications">
                 💊 Medications
+              </button>
+              <button class="nav-button ${this._currentView === 'nutrition' ? 'active' : ''}" data-view="nutrition">
+                🍽️ Food & Drink
               </button>
               <button class="nav-button ${this._currentView === 'health' ? 'active' : ''}" data-view="health">
                 ❤️ Health & Weight
@@ -319,11 +382,18 @@ class PetHealthPanel extends HTMLElement {
       this.loadVisits();
     }
 
+    // Load medications when switching to medications view
+    if (this._currentView === 'medications' && this._medications.length === 0 && !this._loadingMedications) {
+      this.loadMedications();
+    }
+
     switch (this._currentView) {
       case 'dashboard':
         return this.renderDashboard(pet);
       case 'visits':
         return this.renderVisits(pet);
+        case 'nutrition':
+          return this.renderNutrition(pet);
       case 'medications':
         return this.renderMedications(pet);
       case 'health':
@@ -334,26 +404,101 @@ class PetHealthPanel extends HTMLElement {
   }
 
   renderDashboard(pet) {
-    const sensors = this.getPetSensors(pet.entry_id);
+    // Prefer store dump for dashboard metrics
+    const petInternalId = this.getPetIdFromEntry(pet.entry_id);
+    const pd = (this._storeDump && (this._storeDump[petInternalId] || this._storeDump[pet.entry_id]))
+      ? (this._storeDump[petInternalId] || this._storeDump[pet.entry_id])
+      : {};
 
-    // Debug: log available sensors
-    console.log('Pet:', pet.name, 'Sensors found:', Object.keys(sensors));
+    const visits = pd.visits || [];
+    const meds = pd.medications || [];
+    const meals = pd.meals || [];
+    const drinks = pd.drinks || [];
+    const weight = pd.weight || [];
+    const wellbeing = pd.wellbeing || [];
+
+    // Latest records (store lists are sorted desc)
+    const lastVisit = visits.length > 0 ? visits[0] : null;
+    const lastMed = meds.length > 0 ? meds[0] : null;
+    const lastMeal = meals.length > 0 ? meals[0] : null;
+    const lastDrink = drinks.length > 0 ? drinks[0] : null;
+    const latestWeight = weight.length > 0 ? weight[0] : null;
+    const latestWellbeing = wellbeing.length > 0 ? wellbeing[0] : null;
+
+    const formatTs = (ts) => this.formatTimestampEuropean(ts);
+    const hoursSince = (ts) => {
+      if (!ts) return 'N/A';
+      const diff = Date.now() - new Date(ts).getTime();
+      const hours = diff / (1000 * 60 * 60);
+      if (hours < 1) {
+        const mins = Math.round(diff / (1000 * 60));
+        return `${mins} min`;
+      }
+      return `${hours.toFixed(1)} h`;
+    };
+
+    // Today's visits (local day start)
+    const startOfDay = new Date();
+    startOfDay.setHours(0,0,0,0);
+    const todaysVisits = visits.filter(v => new Date(v.timestamp).getTime() >= startOfDay.getTime()).length;
+
+    const unconfirmedCount = visits.filter(v => !v.confirmed).length;
 
     return `
       <div class="content-area">
         <h2>Overview for ${pet.name}</h2>
 
         <div class="stats-grid">
-          ${this.renderStat('Last Bathroom Visit', sensors.last_bathroom_visit)}
-          ${this.renderStat('Daily Visits', sensors.daily_bathroom_visits)}
-          ${this.renderStat('Hours Since Last Visit', sensors.hours_since_last_bathroom_visit)}
-          ${this.renderStat('Unconfirmed Visits', sensors.unconfirmed_bathroom_visits, 'warning')}
-              🍽️ Log Meal
-            </button>
-            <button class="action-button" data-action="log-weight">
-              ⚖️ Log Weight
-            </button>
+          <div class="stat-card">
+            <h3>Last bathroom visit</h3>
+            <div class="stat-value">${lastVisit ? formatTs(lastVisit.timestamp) : 'N/A'}</div>
+            <div class="stat-subtext">${lastVisit ? `${hoursSince(lastVisit.timestamp)} ago` : ''}</div>
           </div>
+
+          <div class="stat-card">
+            <h3>Visits today</h3>
+            <div class="stat-value">${todaysVisits}</div>
+            <div class="stat-subtext">Unconfirmed: ${unconfirmedCount}</div>
+          </div>
+
+          <div class="stat-card">
+            <h3>Hours since last visit</h3>
+            <div class="stat-value">${lastVisit ? hoursSince(lastVisit.timestamp) : 'N/A'}</div>
+            ${lastVisit ? `<div class="stat-subtext">Recorded: ${formatTs(lastVisit.timestamp)}</div>` : ''}
+          </div>
+
+          <div class="stat-card">
+            <h3>Last medication</h3>
+            <div class="stat-value">${lastMed ? formatTs(lastMed.timestamp) : 'N/A'}</div>
+            ${lastMed ? `<div class="stat-subtext">${lastMed.medication_name || ''}</div>` : ''}
+          </div>
+
+          <div class="stat-card">
+            <h3>Last meal / drink</h3>
+            <div class="stat-value">${lastMeal ? formatTs(lastMeal.timestamp) : (lastDrink ? formatTs(lastDrink.timestamp) : 'N/A')}</div>
+            ${lastMeal ? `<div class="stat-subtext">Meal: ${lastMeal.meal_type || lastMeal.amount || ''}</div>` : lastDrink ? `<div class="stat-subtext">Drink: ${lastDrink.drink_type || lastDrink.amount || ''}</div>` : ''}
+          </div>
+
+          <div class="stat-card">
+            <h3>Latest weight</h3>
+            <div class="stat-value">${latestWeight && latestWeight.weight_grams != null ? `${(latestWeight.weight_grams / 1000).toFixed(1)} kg` : 'N/A'}</div>
+            ${latestWeight ? `<div class="stat-subtext">${latestWeight.weight_grams} g — Recorded: ${formatTs(latestWeight.timestamp)}</div>` : ''}
+          </div>
+
+          <div class="stat-card">
+            <h3>Wellbeing</h3>
+            <div class="stat-value">${latestWellbeing && latestWellbeing.wellbeing_score != null ? latestWellbeing.wellbeing_score : 'N/A'}</div>
+            ${latestWellbeing ? `<div class="stat-subtext">Recorded: ${formatTs(latestWellbeing.timestamp)}</div>` : ''}
+          </div>
+        </div>
+
+        <div class="action-section">
+          <h2>Quick actions</h2>
+          <div class="action-buttons">
+              <button class="action-button" data-action="log-bathroom">🚽 Log Bathroom Visit</button>
+              <button class="action-button" data-action="log-medication">💊 Log Medication</button>
+              <button class="action-button" data-action="log-vomit">🤮 Log Vomit</button>
+            </div>
         </div>
       </div>
     `;
@@ -371,19 +516,20 @@ class PetHealthPanel extends HTMLElement {
 
     // Filter visits for this pet
     const petInternalId = this.getPetIdFromEntry(pet.entry_id);
-    console.log('Filtering visits for pet:', pet.name);
-    console.log('Pet entry_id:', pet.entry_id);
-    console.log('Pet internal pet_id:', petInternalId);
-    console.log('Total visits loaded:', this._visits.length);
-    console.log('All visit pet_ids:', this._visits.map(v => v.pet_id));
+    const petVisits = this._visits.filter(
+      (v) => v.pet_id === pet.entry_id || v.pet_id === petInternalId
+    );
 
-    const petVisits = this._visits.filter(v => v.pet_id === pet.entry_id || v.pet_id === petInternalId);
-    console.log('Filtered visits for this pet:', petVisits.length);
+    const unconfirmedVisits = petVisits.filter((v) => !v.confirmed);
+    const confirmedVisits = petVisits.filter((v) => v.confirmed);
 
-    const unconfirmedVisits = petVisits.filter(v => !v.confirmed);
-    const confirmedVisits = petVisits.filter(v => v.confirmed).slice(0, 20); // Show last 20
+    const unconfirmedKey = `visits_unconfirmed:${pet.entry_id}`;
+    const confirmedKey = `visits_confirmed:${pet.entry_id}`;
+    const unconfirmedExpanded = !!this._expandedSections[unconfirmedKey];
+    const confirmedExpanded = !!this._expandedSections[confirmedKey];
 
-    console.log('Unconfirmed:', unconfirmedVisits.length, 'Confirmed:', confirmedVisits.length);
+    const unconfirmedShown = unconfirmedExpanded ? unconfirmedVisits : unconfirmedVisits.slice(0, 5);
+    const confirmedShown = confirmedExpanded ? confirmedVisits : confirmedVisits.slice(0, 5);
 
     return `
       <div class="content-area">
@@ -392,19 +538,24 @@ class PetHealthPanel extends HTMLElement {
         ${unconfirmedVisits.length > 0 ? `
           <div style="margin-bottom: 32px;">
             <h3 style="color: #ff9800; margin-bottom: 16px;">⚠️ Unconfirmed Visits (${unconfirmedVisits.length})</h3>
-            ${this.renderVisitsTable(unconfirmedVisits, true)}
+            ${this.renderVisitsTable(unconfirmedShown, true)}
+            ${unconfirmedVisits.length > 5 ? `<div style="margin-top:8px"><button class="show-more-btn" data-section="visits_unconfirmed" data-pet="${pet.entry_id}">${unconfirmedExpanded ? 'Show less' : 'Show more'}</button></div>` : ''}
           </div>
         ` : ''}
 
         <div>
           <h3 style="margin-bottom: 16px;">✅ Recent Visits</h3>
           ${confirmedVisits.length > 0 ?
-            this.renderVisitsTable(confirmedVisits, false) :
+            `${this.renderVisitsTable(confirmedShown, true)}${confirmedVisits.length > 5 ? `<div style="margin-top:8px"><button class="show-more-btn" data-section="visits_confirmed" data-pet="${pet.entry_id}">${confirmedExpanded ? 'Show less' : 'Show more'}</button></div>` : ''}` :
             '<p style="color: var(--secondary-text-color);">No confirmed visits yet</p>'}
         </div>
       </div>
+      <div style="margin-top:16px;">
+        <button class="action-button" data-action="log-bathroom">🚽 Log Bathroom Visit</button>
+      </div>
     `;
   }
+
 
   renderVisitsTable(visits, showActions) {
     const allPets = this.getPets();
@@ -432,7 +583,7 @@ class PetHealthPanel extends HTMLElement {
 
   renderVisitRow(visit, showActions, allPets) {
     const timestamp = new Date(visit.timestamp);
-    const timeStr = timestamp.toLocaleString();
+    const timeStr = this.formatTimestampEuropean(timestamp);
     const isEditing = this._editingVisitId === visit.visit_id;
 
     const poopDetails = [];
@@ -461,19 +612,19 @@ class PetHealthPanel extends HTMLElement {
           <td style="padding: 12px;">
             <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
               <button class="visit-action-btn" data-action="confirm" data-visit-id="${visit.visit_id}"
-                style="padding: 6px 12px; border: none; border-radius: 4px; background: #4caf50; color: white; cursor: pointer; font-size: 12px;">
+                style="padding: ${visit.confirmed ? '4px 8px' : '6px 12px'}; border: none; border-radius: 4px; background: #4caf50; color: white; cursor: pointer; font-size: ${visit.confirmed ? '11px' : '12px'};">
                 ✓ Confirm
               </button>
               <button class="visit-action-btn" data-action="amend" data-visit-id="${visit.visit_id}"
-                style="padding: 6px 12px; border: none; border-radius: 4px; background: #2196f3; color: white; cursor: pointer; font-size: 12px;">
+                style="padding: ${visit.confirmed ? '4px 8px' : '6px 12px'}; border: none; border-radius: 4px; background: #2196f3; color: white; cursor: pointer; font-size: ${visit.confirmed ? '11px' : '12px'};">
                 ✏️ Amend
               </button>
               <button class="visit-action-btn" data-action="reassign" data-visit-id="${visit.visit_id}"
-                style="padding: 6px 12px; border: none; border-radius: 4px; background: #ff9800; color: white; cursor: pointer; font-size: 12px;">
+                style="padding: ${visit.confirmed ? '4px 8px' : '6px 12px'}; border: none; border-radius: 4px; background: #ff9800; color: white; cursor: pointer; font-size: ${visit.confirmed ? '11px' : '12px'};">
                 🔄 Reassign
               </button>
               <button class="visit-action-btn" data-action="delete" data-visit-id="${visit.visit_id}"
-                style="padding: 6px 12px; border: none; border-radius: 4px; background: #f44336; color: white; cursor: pointer; font-size: 12px;">
+                style="padding: ${visit.confirmed ? '4px 8px' : '6px 12px'}; border: none; border-radius: 4px; background: #f44336; color: white; cursor: pointer; font-size: ${visit.confirmed ? '11px' : '12px'};">
                 🗑️ Delete
               </button>
             </div>
@@ -500,7 +651,6 @@ class PetHealthPanel extends HTMLElement {
       });
 
       this._visits = result.visits || [];
-      console.log('Loaded visits:', this._visits.length);
 
     } catch (err) {
       console.error('Failed to load visits:', err);
@@ -511,20 +661,415 @@ class PetHealthPanel extends HTMLElement {
     }
   }
 
+  async loadMedications() {
+    if (this._loadingMedications) return;
+    this._loadingMedications = true;
+
+    try {
+      const result = await this.hass.callWS({
+        type: 'pet_health/get_medications'
+      });
+
+      this._medications = result.medications || [];
+    } catch (err) {
+      // If the backend hasn't registered the websocket command yet, retry a few times
+      if (err && err.code === 'unknown_command' && this._medicationsRetries < 5) {
+        this._medicationsRetries += 1;
+        const retryDelay = 300 * this._medicationsRetries; // ms
+        setTimeout(() => {
+          this._loadingMedications = false;
+          this.loadMedications();
+        }, retryDelay);
+        return;
+      }
+
+      console.error('Failed to load medications:', err);
+      this._medications = [];
+    } finally {
+      this._loadingMedications = false;
+      this.render();
+    }
+  }
+
   renderMedications(pet) {
+    // Prefer store-backed medication records, but merge with sensor-derived records and dedupe
+    const sensors = this.getPetSensors(pet.entry_id);
+
+    // Find medication-related sensors by key
+    const medSensorEntries = Object.entries(sensors).filter(([key]) =>
+      key.includes('medic') || key.includes('med_') || key.includes('medication')
+    );
+
+    const medsFromSensors = [];
+
+    medSensorEntries.forEach(([key, sensor]) => {
+      // Common shapes: attributes.medications (array of objects), attributes.medication_records, or a single-record sensor
+      const attrs = sensor.attributes || {};
+
+      if (Array.isArray(attrs.medications) && attrs.medications.length > 0) {
+        attrs.medications.forEach((m) =>
+          medsFromSensors.push({
+            medication_name: m.medication_name || m.name || m.medication || '',
+            timestamp: m.timestamp || m.given_at || sensor.last_changed || new Date().toISOString(),
+            dosage: m.dosage || m.amount || '',
+            unit: m.unit || '',
+            notes: m.notes || m.note || '',
+            pet_id: attrs.pet || pet.entry_id,
+          })
+        );
+        return;
+      }
+
+      if (Array.isArray(attrs.medication_records) && attrs.medication_records.length > 0) {
+        attrs.medication_records.forEach((m) =>
+          medsFromSensors.push({
+            medication_name: m.medication_name || m.name || '',
+            timestamp: m.timestamp || m.given_at || sensor.last_changed || new Date().toISOString(),
+            dosage: m.dosage || '',
+            unit: m.unit || '',
+            notes: m.notes || '',
+            pet_id: attrs.pet || pet.entry_id,
+          })
+        );
+        return;
+      }
+
+      // If sensor represents a single last-medication event, try to build a record
+      if (sensor.state && sensor.state !== 'unknown' && sensor.state !== 'unavailable') {
+        medsFromSensors.push({
+          medication_name: attrs.medication_name || sensor.state || key,
+          timestamp: attrs.given_at || sensor.last_changed || new Date().toISOString(),
+          dosage: attrs.dosage || '',
+          unit: attrs.unit || '',
+          notes: attrs.notes || '',
+          pet_id: attrs.pet || pet.entry_id,
+        });
+      }
+    });
+
+    // Get store-provided meds either from loaded _medications or from the config entry payload
+    let storeMeds = [];
+    const configEntry = this._configEntries.find((e) => e.entry_id === pet.entry_id);
+    // Prefer authoritative store dump when available
+    const petInternalId = this.getPetIdFromEntry(pet.entry_id);
+    if (this._storeDump && (this._storeDump[petInternalId] || this._storeDump[pet.entry_id])) {
+      const pd = this._storeDump[petInternalId] || this._storeDump[pet.entry_id] || {};
+      storeMeds = (pd.medications || []).map((m) => ({
+        medication_name: m.medication_name || m.name || m.medication || '',
+        timestamp: m.timestamp || m.given_at || new Date().toISOString(),
+        dosage: m.dosage || m.amount || '',
+        unit: m.unit || '',
+        notes: m.notes || '',
+        pet_id: petInternalId || pet.entry_id,
+      }));
+    } else if (this._medications && this._medications.length > 0) {
+      storeMeds = this._medications.filter((m) => m.pet_id === pet.entry_id || m.pet_id === petInternalId);
+    } else if (configEntry && Array.isArray(configEntry.medications) && configEntry.medications.length > 0) {
+      storeMeds = configEntry.medications.map((m) => ({
+        medication_name: m.medication_name || m.name || m.medication || '',
+        timestamp: m.timestamp || m.given_at || new Date().toISOString(),
+        dosage: m.dosage || m.amount || '',
+        unit: m.unit || '',
+        notes: m.notes || '',
+        pet_id: configEntry.pet_id || pet.entry_id,
+      }));
+    }
+
+    // Merge: prefer storeMeds, then append sensor meds that are not duplicates
+    const merged = [...storeMeds];
+    const seen = new Set(storeMeds.map((s) => `${s.medication_name}::${s.timestamp}`));
+    medsFromSensors.forEach((s) => {
+      const key = `${s.medication_name}::${s.timestamp}`;
+      if (!seen.has(key)) {
+        merged.push(s);
+        seen.add(key);
+      }
+    });
+
+    const meds = merged;
+
+    const medsKey = `medications:${pet.entry_id}`;
+    const medsExpanded = !!this._expandedSections[medsKey];
+    const medsShown = medsExpanded ? meds : meds.slice(0, 5);
+
     return `
       <div class="content-area">
-        <h2>Medication Tracking</h2>
-        <p>Coming soon: Medication schedule and history</p>
+        <h2>Medications for ${pet.name}</h2>
+        ${this.renderMedicationsTable(medsShown)}
+        ${meds.length > 5 ? `<div style="margin-top:8px"><button class="show-more-btn" data-section="medications" data-pet="${pet.entry_id}">${medsExpanded ? 'Show less' : 'Show more'}</button></div>` : ''}
+        <div style="margin-top:16px;">
+          <button class="action-button" data-action="log-medication">💊 Log Medication</button>
+        </div>
+      </div>
+    `;
+  }
+
+  renderMedicationsTable(meds) {
+    if (!meds || meds.length === 0) {
+      return `<p>No medication records found</p>`;
+    }
+
+    const rows = meds
+      .map(
+        (m) => `
+      <tr>
+        <td style="padding: 8px;">${m.medication_name}</td>
+        <td style="padding: 8px;">${this.formatTimestampEuropean(m.timestamp)}</td>
+        <td style="padding: 8px;">${m.dosage || ''} ${m.unit || ''}</td>
+        <td style="padding: 8px;">${m.notes || ''}</td>
+      </tr>`
+      )
+      .join('');
+
+    return `
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; background: var(--card-background-color);">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--divider-color); text-align: left;">
+              <th style="padding: 12px;">Medication</th>
+              <th style="padding: 12px;">Given at</th>
+              <th style="padding: 12px;">Dosage</th>
+              <th style="padding: 12px;">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
       </div>
     `;
   }
 
   renderHealth(pet) {
+    // Use authoritative store dump for health data
+    const petInternalId = this.getPetIdFromEntry(pet.entry_id);
+    const pd = (this._storeDump && (this._storeDump[petInternalId] || this._storeDump[pet.entry_id]))
+      ? (this._storeDump[petInternalId] || this._storeDump[pet.entry_id])
+      : {};
+
+    const weight = pd.weight || [];
+    const wellbeing = pd.wellbeing || [];
+    const vomit = pd.vomit || [];
+
+    // Compute latest weight and delta (use weight_grams)
+    const latestWeight = weight.length > 0 ? weight[0] : null;
+    const prevWeight = weight.length > 1 ? weight[1] : null;
+    let weightDelta = null;
+    if (latestWeight && prevWeight && latestWeight.weight_grams != null && prevWeight.weight_grams != null) {
+      weightDelta = latestWeight.weight_grams - prevWeight.weight_grams;
+    }
+
+      const weightRows = weight.length > 0 ? weight.map(w => `
+        <tr>
+          <td style="padding:8px;">${this.formatTimestampEuropean(w.timestamp)}</td>
+          <td style="padding:8px;">${w.weight_grams != null ? w.weight_grams : ''} g</td>
+          <td style="padding:8px;">${w.notes || ''}</td>
+        </tr>`).join('') : '';
+
+    const wellbeingRows = wellbeing.length > 0 ? wellbeing.map(w => `
+      <tr>
+        <td style="padding:8px;">${this.formatTimestampEuropean(w.timestamp)}</td>
+        <td style="padding:8px;">${w.wellbeing_score != null ? w.wellbeing_score : ''}</td>
+        <td style="padding:8px;">${w.notes || ''}</td>
+      </tr>`).join('') : '';
+
+    const vomitRows = vomit.length > 0 ? vomit.map(v => `
+      <tr>
+        <td style="padding:8px;">${this.formatTimestampEuropean(v.timestamp)}</td>
+        <td style="padding:8px;">${v.vomit_type || ''}</td>
+        <td style="padding:8px;">${v.notes || ''}</td>
+      </tr>`).join('') : '';
+
     return `
       <div class="content-area">
-        <h2>Health & Weight Tracking</h2>
-        <p>Coming soon: Weight charts and health monitoring</p>
+        <h2>Health & Weight for ${pet.name}</h2>
+
+        <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:16px;">
+          <div class="stat-card" style="min-width:200px;">
+            <h3>Latest weight</h3>
+            <div class="stat-value">${latestWeight && latestWeight.weight_grams != null ? `${latestWeight.weight_grams} g` : 'N/A'}</div>
+            ${weightDelta != null ? `<div class="stat-subtext">Change vs previous: ${weightDelta > 0 ? '+' : ''}${weightDelta} g</div>` : ''}
+            ${latestWeight ? `<div class="stat-subtext">Recorded: ${this.formatTimestampEuropean(latestWeight.timestamp)}</div>` : ''}
+          </div>
+
+          <div class="stat-card" style="min-width:200px;">
+            <h3>Wellbeing (latest)</h3>
+            <div class="stat-value">${wellbeing.length > 0 && wellbeing[0].wellbeing_score != null ? wellbeing[0].wellbeing_score : 'N/A'}</div>
+            ${wellbeing.length > 0 ? `<div class="stat-subtext">${wellbeing[0].notes || ''}</div>` : ''}
+          </div>
+
+          <div class="stat-card" style="min-width:200px;">
+            <h3>Recent vomit events</h3>
+            <div class="stat-value">${vomit.length}</div>
+            ${vomit.length > 0 ? `<div class="stat-subtext">Last: ${this.formatTimestampEuropean(vomit[0].timestamp)}</div>` : ''}
+          </div>
+        </div>
+
+        <h3>Weight history</h3>
+        ${weight.length > 0 ? `
+          <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse: collapse; background: var(--card-background-color);">
+              <thead>
+                <tr style="border-bottom:2px solid var(--divider-color); text-align:left;">
+                  <th style="padding:12px;">When</th>
+                  <th style="padding:12px;">Weight</th>
+                  <th style="padding:12px;">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${weightRows}
+              </tbody>
+            </table>
+          </div>
+        ` : '<p>No weight records found</p>'}
+
+        <h3 style="margin-top:18px;">Wellbeing history</h3>
+        ${wellbeing.length > 0 ? `
+          <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse: collapse; background: var(--card-background-color);">
+              <thead>
+                <tr style="border-bottom:2px solid var(--divider-color); text-align:left;">
+                  <th style="padding:12px;">When</th>
+                  <th style="padding:12px;">Score</th>
+                  <th style="padding:12px;">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${wellbeingRows}
+              </tbody>
+            </table>
+          </div>
+        ` : '<p>No wellbeing records found</p>'}
+
+        <h3 style="margin-top:18px;">Vomit events</h3>
+        ${vomit.length > 0 ? `
+          <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse: collapse; background: var(--card-background-color);">
+              <thead>
+                <tr style="border-bottom:2px solid var(--divider-color); text-align:left;">
+                  <th style="padding:12px;">When</th>
+                  <th style="padding:12px;">Type</th>
+                  <th style="padding:12px;">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${vomitRows}
+              </tbody>
+            </table>
+          </div>
+        ` : '<p>No vomit records found</p>'}
+        <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="action-button" data-action="log-weight">⚖️ Log Weight</button>
+          <button class="action-button" data-action="log-vomit">🤮 Log Vomit</button>
+        </div>
+      </div>
+    `;
+  }
+
+  renderNutrition(pet) {
+    // Use store dump when available
+    const petInternalId = this.getPetIdFromEntry(pet.entry_id);
+    const pd = (this._storeDump && (this._storeDump[petInternalId] || this._storeDump[pet.entry_id]))
+      ? (this._storeDump[petInternalId] || this._storeDump[pet.entry_id])
+      : {};
+
+    const meals = pd.meals || [];
+    const drinks = pd.drinks || [];
+    const thirst = pd.thirst_levels || [];
+    const appetite = pd.appetite_levels || [];
+
+    const mealsKey = `meals:${pet.entry_id}`;
+    const drinksKey = `drinks:${pet.entry_id}`;
+    const thirstKey = `thirst:${pet.entry_id}`;
+    const appetiteKey = `appetite:${pet.entry_id}`;
+
+    const mealsExpanded = !!this._expandedSections[mealsKey];
+    const drinksExpanded = !!this._expandedSections[drinksKey];
+    const thirstExpanded = !!this._expandedSections[thirstKey];
+    const appetiteExpanded = !!this._expandedSections[appetiteKey];
+
+    const mealsShown = mealsExpanded ? meals : meals.slice(0, 5);
+    const drinksShown = drinksExpanded ? drinks : drinks.slice(0, 5);
+    const thirstShown = thirstExpanded ? thirst : thirst.slice(0, 5);
+    const appetiteShown = appetiteExpanded ? appetite : appetite.slice(0, 5);
+
+    const mealsRows = mealsShown.length > 0 ? mealsShown.map(m => `
+      <tr>
+        <td style="padding:8px;">${m.meal_type || m.amount || ''}</td>
+        <td style="padding:8px;">${this.formatTimestampEuropean(m.timestamp)}</td>
+        <td style="padding:8px;">${m.amount || ''}</td>
+        <td style="padding:8px;">${m.notes || ''}</td>
+      </tr>`).join('') : '';
+
+    const drinksRows = drinksShown.length > 0 ? drinksShown.map(d => `
+      <tr>
+        <td style="padding:8px;">${d.drink_type || ''}</td>
+        <td style="padding:8px;">${this.formatTimestampEuropean(d.timestamp)}</td>
+        <td style="padding:8px;">${d.amount || ''}</td>
+        <td style="padding:8px;">${d.notes || ''}</td>
+      </tr>`).join('') : '';
+
+    const thirstList = thirstShown.length > 0 ? thirstShown.map(t => `
+      <li>${this.formatTimestampEuropean(t.timestamp)}: ${t.level != null ? t.level : t.note || ''}</li>`).join('') : '<li>No records</li>';
+    const appetiteList = appetiteShown.length > 0 ? appetiteShown.map(a => `
+      <li>${this.formatTimestampEuropean(a.timestamp)}: ${a.level != null ? a.level : a.note || ''}</li>`).join('') : '<li>No records</li>';
+
+    return `
+      <div class="content-area">
+        <h2>Food & Drink for ${pet.name}</h2>
+
+        <h3>Meals</h3>
+        ${meals.length > 0 ? `
+          <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse: collapse; background: var(--card-background-color);">
+              <thead>
+                <tr style="border-bottom:2px solid var(--divider-color); text-align:left;">
+                  <th style="padding:12px;">Type</th>
+                  <th style="padding:12px;">When</th>
+                  <th style="padding:12px;">Amount</th>
+                  <th style="padding:12px;">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${mealsRows}
+              </tbody>
+            </table>
+          </div>
+        ` : '<p>No meal records found</p>'}
+        ${meals.length > 5 ? `<div style="margin-top:8px"><button class="show-more-btn" data-section="meals" data-pet="${pet.entry_id}">${mealsExpanded ? 'Show less' : 'Show more'}</button></div>` : ''}
+
+        <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="action-button" data-action="log-meal">🍽️ Log Meal</button>
+          <button class="action-button" data-action="log-drink">🥤 Log Drink</button>
+        </div>
+
+        <h3 style="margin-top:18px;">Drinks</h3>
+        ${drinks.length > 0 ? `
+          <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse: collapse; background: var(--card-background-color);">
+              <thead>
+                <tr style="border-bottom:2px solid var(--divider-color); text-align:left;">
+                  <th style="padding:12px;">Type</th>
+                  <th style="padding:12px;">When</th>
+                  <th style="padding:12px;">Amount</th>
+                  <th style="padding:12px;">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${drinksRows}
+              </tbody>
+            </table>
+          </div>
+        ` : '<p>No drink records found</p>'}
+        ${drinks.length > 5 ? `<div style="margin-top:8px"><button class="show-more-btn" data-section="drinks" data-pet="${pet.entry_id}">${drinksExpanded ? 'Show less' : 'Show more'}</button></div>` : ''}
+
+        <h3 style="margin-top:18px;">Thirst levels</h3>
+        <ul>${thirstList}</ul>
+        ${thirst.length > 5 ? `<div style="margin-top:8px"><button class="show-more-btn" data-section="thirst" data-pet="${pet.entry_id}">${thirstExpanded ? 'Show less' : 'Show more'}</button></div>` : ''}
+
+        <h3 style="margin-top:18px;">Appetite levels</h3>
+        <ul>${appetiteList}</ul>
+        ${appetite.length > 5 ? `<div style="margin-top:8px"><button class="show-more-btn" data-section="appetite" data-pet="${pet.entry_id}">${appetiteExpanded ? 'Show less' : 'Show more'}</button></div>` : ''}
       </div>
     `;
   }
@@ -578,7 +1123,7 @@ class PetHealthPanel extends HTMLElement {
 
     const petName = configEntry.title.toLowerCase().replace(/\s+/g, '_');
 
-    console.log('Looking for sensors for pet:', configEntry.title, 'entity prefix:', petName);
+    // Looking for sensors for pet: use config entry title as prefix
 
     // Find all sensors for this pet by matching pet name in entity_id or pet attribute
     Object.keys(states).forEach(entityId => {
@@ -598,12 +1143,9 @@ class PetHealthPanel extends HTMLElement {
           }
 
           sensors[key] = entity;
-          console.log('Found sensor:', entityId, 'key:', key);
         }
       }
     });
-    console.log('Finished scanning sensors for pet:', sensors);
-    console.log('Total sensors found:', Object.keys(sensors).length);
     return sensors;
   }
 
@@ -621,6 +1163,17 @@ class PetHealthPanel extends HTMLElement {
     this.querySelectorAll('.nav-button').forEach(button => {
       button.addEventListener('click', (e) => {
         this._currentView = e.target.dataset.view;
+        this.render();
+      });
+    });
+
+    // Show more/less buttons
+    this.querySelectorAll('.show-more-btn').forEach(button => {
+      button.addEventListener('click', (e) => {
+        const section = e.target.dataset.section;
+        const petId = e.target.dataset.pet;
+        const key = `${section}:${petId}`;
+        this._expandedSections[key] = !this._expandedSections[key];
         this.render();
       });
     });
@@ -656,20 +1209,60 @@ class PetHealthPanel extends HTMLElement {
         });
         break;
       case 'log-medication':
-        alert('Please select medication from the integration options first');
+        {
+          const name = prompt('Medication name:');
+          if (!name) return;
+          const dosage = prompt('Dosage (number, optional):');
+          const unit = prompt('Unit (e.g. mg, ml, g) (optional):');
+          const notes = prompt('Notes (optional):');
+          const payload = {
+            config_entry_id: pet.entry_id,
+            medication_name: name,
+          };
+          if (dosage) payload.dosage = isNaN(parseFloat(dosage)) ? dosage : parseFloat(dosage);
+          if (unit) payload.unit = unit;
+          if (notes) payload.notes = notes;
+          this.callService('log_medication', payload);
+        }
         break;
       case 'log-meal':
-        this.callService('log_meal', {
-          config_entry_id: pet.entry_id,
-          amount: 'normal'
-        });
+        {
+          const amt = prompt('Meal amount/description (e.g. small/normal/large):', 'normal');
+          this.callService('log_meal', {
+            config_entry_id: pet.entry_id,
+            amount: amt || 'normal'
+          });
+        }
+        break;
+      case 'log-drink':
+        {
+          const dAmt = prompt('Drink amount (e.g. 50ml):', '');
+          this.callService('log_drink', {
+            config_entry_id: pet.entry_id,
+            amount: dAmt || ''
+          });
+        }
         break;
       case 'log-weight':
-        const weight = prompt('Enter weight in grams:');
-        if (weight) {
-          this.callService('log_weight', {
+        {
+          const weight = prompt('Enter weight in grams:');
+          if (weight) {
+            this.callService('log_weight', {
+              config_entry_id: pet.entry_id,
+              weight_grams: parseInt(weight)
+            });
+          }
+        }
+        break;
+      case 'log-vomit':
+        {
+          const vType = prompt('Vomit type (e.g. food, bile, foam):');
+          if (!vType) return;
+          const vNotes = prompt('Notes (optional):');
+          this.callService('log_vomit', {
             config_entry_id: pet.entry_id,
-            weight_grams: parseInt(weight)
+            vomit_type: vType,
+            notes: vNotes || ''
           });
         }
         break;
