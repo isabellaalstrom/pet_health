@@ -214,8 +214,21 @@ class PetHealthPanel extends HTMLElement {
       const dataType = event.data.data_type;
       
       if (petId) {
+        // The event contains the internal pet_id, but the caches are keyed by entry_id
+        // So we need to convert and clear both to be safe
+        const entryId = this.getEntryIdFromPetId(petId);
+        
+        // Clear cache using internal pet_id
         this._visitsLoadedFor.delete(petId);
         this._medicationsLoadedFor.delete(petId);
+        
+        // Also clear cache using entry_id if we found it
+        if (entryId) {
+          this._visitsLoadedFor.delete(entryId);
+          this._medicationsLoadedFor.delete(entryId);
+          // Clear per-pet cached visits
+          delete this._visitsByPet[entryId];
+        }
       }
       
       // Reload store dump to get all updated data
@@ -890,6 +903,15 @@ class PetHealthPanel extends HTMLElement {
     // Entries may come from different sources: older shape uses entry.data.pet_id,
     // newer websocket helper returns a flat object with pet_id at top-level.
     return entry?.data?.pet_id ?? entry?.pet_id;
+  }
+
+  getEntryIdFromPetId(petId) {
+    // Find the config entry that has this internal pet_id
+    const entry = this._configEntries.find((e) => {
+      const internalId = e.data?.pet_id ?? e.pet_id;
+      return internalId === petId;
+    });
+    return entry?.entry_id;
   }
 
   _normalizeConfirmed(val) {
