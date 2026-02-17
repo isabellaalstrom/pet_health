@@ -43,7 +43,7 @@ function App() {
   };
 
   const getPetImageUrl = (pet: PetEntry) => {
-    const imagePath = pet.pet_image_path || pet.data?.pet_image_path;
+    const imagePath = pet.pet_image_path;
     if (imagePath) {
       if (imagePath.startsWith('http')) {
         return imagePath;

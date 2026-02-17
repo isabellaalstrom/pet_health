@@ -16,9 +16,6 @@ export interface PetEntry {
   pet_type?: string;
   pet_image_path?: string;
   medications?: any[];
-  data?: {
-    pet_image_path?: string;
-  };
 }
 
 export interface Visit {

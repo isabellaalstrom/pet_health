@@ -7,20 +7,36 @@ export function useHomeAssistant(): { hass: HomeAssistant | null; api: PetHealth
   const [api, setApi] = useState<PetHealthAPI | null>(null);
 
   useEffect(() => {
-    // Home Assistant provides the panel with hass through custom elements
-    const checkHass = () => {
-      const panelElement = document.querySelector('pet-health-panel');
-      if (panelElement && (panelElement as any).hass) {
-        const hassInstance = (panelElement as any).hass;
+    // First check if hass is already available
+    const panelElement = document.querySelector('pet-health-panel');
+    if (panelElement && (panelElement as any).hass) {
+      const hassInstance = (panelElement as any).hass;
+      setHass(hassInstance);
+      setApi(new PetHealthAPI(hassInstance));
+      return;
+    }
+
+    // Use MutationObserver to detect when the element or hass becomes available
+    const observer = new MutationObserver(() => {
+      const element = document.querySelector('pet-health-panel');
+      if (element && (element as any).hass) {
+        const hassInstance = (element as any).hass;
         setHass(hassInstance);
         setApi(new PetHealthAPI(hassInstance));
+        observer.disconnect();
       }
-    };
+    });
 
-    checkHass();
-    const interval = setInterval(checkHass, 100);
+    // Observe the document body for changes
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['hass'],
+    });
 
-    return () => clearInterval(interval);
+    // Cleanup
+    return () => observer.disconnect();
   }, []);
 
   return { hass, api };
