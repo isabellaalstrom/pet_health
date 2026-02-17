@@ -131,7 +131,19 @@ class PetHealthOptionsFlow(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Show main menu."""
+        """Show main menu.
+        
+        Args:
+            user_input: User's selected action from the menu, or None if showing form.
+        
+        Returns:
+            ConfigFlowResult: Either a form to display the menu or navigation to next step.
+        
+        Menu actions:
+            - edit_image: Navigate to edit pet image path
+            - medications: Navigate to medication management
+            - done: Complete configuration
+        """
         if user_input is not None:
             action = user_input.get("action")
             if action == "edit_image":

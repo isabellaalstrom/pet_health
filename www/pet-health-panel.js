@@ -620,12 +620,12 @@ class PetHealthPanel extends HTMLElement {
                 <button 
                   class="pet-button ${pet.entry_id === this._selectedPetId ? 'selected' : ''}"
                   data-pet-id="${pet.entry_id}"
+                  data-pet-type="${pet.type}"
                 >
                   <img 
                     class="pet-button-image" 
                     src="${this.getPetImageUrl(pet)}" 
                     alt="${pet.name}"
-                    onerror="this.src='${this.getDefaultPetImageUrl(pet.type)}'"
                   />
                   <span class="pet-button-name">${pet.name}</span>
                 </button>
@@ -1706,7 +1706,7 @@ class PetHealthPanel extends HTMLElement {
 
   getPetImageUrl(pet) {
     // Check if pet has a custom image path configured
-    const imagePath = pet.data?.pet_image_path || pet.pet_image_path;
+    const imagePath = pet.pet_image_path;
     
     if (imagePath) {
       // If it's a relative path (doesn't start with / or http), treat it as www relative
@@ -1769,6 +1769,15 @@ class PetHealthPanel extends HTMLElement {
           this.render();
         }
       });
+      
+      // Handle image load errors
+      const img = button.querySelector('.pet-button-image');
+      if (img) {
+        img.addEventListener('error', () => {
+          const petType = button.dataset.petType || 'other';
+          img.src = this.getDefaultPetImageUrl(petType);
+        });
+      }
     });
 
     // Navigation buttons
