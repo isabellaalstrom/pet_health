@@ -75,6 +75,13 @@ jobs:
         run: |
           cd frontend
           npm run build
+          
+          # Verify build output
+          if [ ! -f ../www/pet-health-panel.js ]; then
+            echo "Error: Build did not produce expected output!"
+            exit 1
+          fi
+          
           echo "=== Build complete. Checking output ==="
           ls -lh ../www/pet-health-panel.js
       
@@ -83,6 +90,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Verify build output exists
+          if [ ! -f www/pet-health-panel.js ]; then
+            echo "Error: Build output www/pet-health-panel.js not found!"
+            exit 1
+          fi
+          
           git add manifest.json hacs.json frontend/package.json www/pet-health-panel.js
           git commit -m "Release v${{ steps.version.outputs.VERSION }}" || echo "No changes to commit"
           git push origin main
@@ -97,7 +111,7 @@ jobs:
         id: release_notes
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          PREV_TAG=$(git tag --sort=-version:refname | head -n 1 || echo "")
           
           if [ -z "$PREV_TAG" ]; then
             NOTES="## What's Changed\n\nInitial release\n\n## Installation\n\n1. Download the zip file\n2. Extract to your Home Assistant \`custom_components\` directory\n3. Restart Home Assistant\n4. Add the Pet Health integration via Settings → Devices & Services"
