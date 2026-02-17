@@ -1,12 +1,14 @@
+// Home Assistant types
 export interface HomeAssistant {
-  callWS: (params: any) => Promise<any>;
-  callService: (domain: string, service: string, data: any) => Promise<any>;
+  callWS: <T = unknown>(params: Record<string, unknown>) => Promise<T>;
+  callService: (domain: string, service: string, data?: Record<string, unknown> | object) => Promise<void>;
   connection: {
-    subscribeEvents: (callback: (event: any) => void, eventType: string) => Promise<() => void>;
+    subscribeEvents: (callback: (event: unknown) => void, eventType: string) => Promise<() => void>;
   };
-  states: Record<string, any>;
+  states: Record<string, unknown>;
 }
 
+// Pet types
 export interface PetEntry {
   entry_id: string;
   title?: string;
@@ -15,9 +17,10 @@ export interface PetEntry {
   name?: string;
   pet_type?: string;
   pet_image_path?: string;
-  medications?: any[];
+  medications?: Medication[];
 }
 
+// Visit types
 export interface Visit {
   visit_id: string;
   timestamp: string;
@@ -31,6 +34,19 @@ export interface Visit {
   config_entry_id?: string;
 }
 
+export interface LogBathroomVisitData {
+  config_entry_id: string;
+  timestamp?: string;
+  did_pee?: boolean;
+  did_poop?: boolean;
+  consistency?: string;
+  color?: string;
+  urine_amount?: number;
+  notes?: string;
+  confirmed?: boolean;
+}
+
+// Medication types
 export interface Medication {
   medication_id: string;
   medication_name: string;
@@ -46,14 +62,34 @@ export interface MedicationLog {
   notes?: string;
 }
 
+export interface LogMedicationData {
+  config_entry_id: string;
+  medication_id: string;
+  timestamp?: string;
+  dosage?: string;
+  unit?: string;
+  notes?: string;
+}
+
+export interface AmendVisitData {
+  did_pee?: boolean;
+  did_poop?: boolean;
+  consistency?: string;
+  color?: string;
+  urine_amount?: number;
+  notes?: string;
+}
+
+// Store data types
 export interface StoreData {
   visits?: Visit[];
   medications?: Record<string, MedicationLog[]>;
-  meals?: any[];
-  drinks?: any[];
-  weights?: any[];
-  vomits?: any[];
-  assessments?: any[];
+  meals?: unknown[];
+  drinks?: unknown[];
+  weights?: unknown[];
+  vomits?: unknown[];
+  assessments?: unknown[];
 }
 
+// View types
 export type View = 'dashboard' | 'visits' | 'medications' | 'health' | 'nutrition';

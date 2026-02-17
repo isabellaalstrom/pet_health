@@ -7,36 +7,34 @@ export function useHomeAssistant(): { hass: HomeAssistant | null; api: PetHealth
   const [api, setApi] = useState<PetHealthAPI | null>(null);
 
   useEffect(() => {
-    // First check if hass is already available
-    const panelElement = document.querySelector('pet-health-panel');
-    if (panelElement && (panelElement as any).hass) {
-      const hassInstance = (panelElement as any).hass;
-      setHass(hassInstance);
-      setApi(new PetHealthAPI(hassInstance));
+    let checkCount = 0;
+    const maxChecks = 50; // Check for 5 seconds max (50 * 100ms)
+    
+    const checkHass = () => {
+      const panelElement = document.querySelector('pet-health-panel');
+      if (panelElement && (panelElement as any).hass) {
+        const hassInstance = (panelElement as any).hass;
+        setHass(hassInstance);
+        setApi(new PetHealthAPI(hassInstance));
+        return true;
+      }
+      return false;
+    };
+
+    // First immediate check
+    if (checkHass()) {
       return;
     }
 
-    // Use MutationObserver to detect when the element or hass becomes available
-    const observer = new MutationObserver(() => {
-      const element = document.querySelector('pet-health-panel');
-      if (element && (element as any).hass) {
-        const hassInstance = (element as any).hass;
-        setHass(hassInstance);
-        setApi(new PetHealthAPI(hassInstance));
-        observer.disconnect();
+    // Poll with a reasonable limit and backoff
+    const interval = setInterval(() => {
+      checkCount++;
+      if (checkHass() || checkCount >= maxChecks) {
+        clearInterval(interval);
       }
-    });
+    }, 100);
 
-    // Observe the document body for changes
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['hass'],
-    });
-
-    // Cleanup
-    return () => observer.disconnect();
+    return () => clearInterval(interval);
   }, []);
 
   return { hass, api };
