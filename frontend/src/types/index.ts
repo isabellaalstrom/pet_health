@@ -9,10 +9,13 @@ export interface HomeAssistant {
 
 export interface PetEntry {
   entry_id: string;
+  title?: string;
   pet_id?: string;
-  name: string;
+  pet_name?: string;
+  name?: string;
   pet_type?: string;
   pet_image_path?: string;
+  medications?: any[];
   data?: {
     pet_image_path?: string;
   };

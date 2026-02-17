@@ -38,6 +38,10 @@ function App() {
 
   const selectedPet = pets.find(p => p.entry_id === selectedPetId);
 
+  const getPetName = (pet: PetEntry) => {
+    return pet.pet_name || pet.title || pet.name || 'Unknown Pet';
+  };
+
   const getPetImageUrl = (pet: PetEntry) => {
     const imagePath = pet.pet_image_path || pet.data?.pet_image_path;
     if (imagePath) {
@@ -104,14 +108,14 @@ function App() {
             >
               <img
                 src={getPetImageUrl(pet)}
-                alt={pet.name}
+                alt={getPetName(pet)}
                 className="pet-button-image"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.src = '/pet_health_panel/default-other.svg';
                 }}
               />
-              <span className="pet-button-name">{pet.name}</span>
+              <span className="pet-button-name">{getPetName(pet)}</span>
             </button>
           ))}
         </div>
@@ -153,7 +157,7 @@ function App() {
       {currentView === 'dashboard' && selectedPet && (
         <div className="content">
           <div className="card">
-            <h2>Dashboard for {selectedPet.name}</h2>
+            <h2>Dashboard for {getPetName(selectedPet)}</h2>
             <div className="stats">
               <div className="stat-card">
                 <div className="stat-label">Total Visits</div>
@@ -180,7 +184,7 @@ function App() {
       {currentView === 'visits' && selectedPet && (
         <div className="content">
           <div className="card">
-            <h2>Bathroom Visits for {selectedPet.name}</h2>
+            <h2>Bathroom Visits for {getPetName(selectedPet)}</h2>
             <button className="action-button" onClick={handleLogVisit}>
               Log New Visit
             </button>
@@ -218,7 +222,7 @@ function App() {
       {currentView === 'medications' && selectedPet && (
         <div className="content">
           <div className="card">
-            <h2>Medications for {selectedPet.name}</h2>
+            <h2>Medications for {getPetName(selectedPet)}</h2>
             <p>Medication tracking coming soon...</p>
           </div>
         </div>
@@ -227,7 +231,7 @@ function App() {
       {currentView === 'health' && selectedPet && (
         <div className="content">
           <div className="card">
-            <h2>Health Tracking for {selectedPet.name}</h2>
+            <h2>Health Tracking for {getPetName(selectedPet)}</h2>
             <p>Weight, wellbeing, and vomit tracking coming soon...</p>
           </div>
         </div>
@@ -236,7 +240,7 @@ function App() {
       {currentView === 'nutrition' && selectedPet && (
         <div className="content">
           <div className="card">
-            <h2>Nutrition for {selectedPet.name}</h2>
+            <h2>Nutrition for {getPetName(selectedPet)}</h2>
             <p>Meal and drink tracking coming soon...</p>
           </div>
         </div>
