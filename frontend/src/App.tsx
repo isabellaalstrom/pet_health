@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
-import { useHomeAssistant } from './hooks/useHomeAssistant';
+import { useState, useEffect, useMemo } from 'react';
 import { usePets } from './hooks/usePets';
 import { useVisits } from './hooks/useVisits';
-import type { View, PetEntry } from './types';
+import { PetHealthAPI } from './services/petHealthApi';
+import type { View, PetEntry, HomeAssistant } from './types';
 import './App.css';
 
-function App() {
-  const { hass, api } = useHomeAssistant();
+interface AppProps {
+  hass: HomeAssistant;
+}
+
+function App({ hass }: AppProps) {
+  const api = useMemo(() => new PetHealthAPI(hass), [hass]);
   const { pets, loading: petsLoading } = usePets(api);
   const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -81,7 +85,7 @@ function App() {
     reloadVisits();
   };
 
-  if (petsLoading || !hass) {
+  if (petsLoading) {
     return <div className="loading">Loading Pet Health...</div>;
   }
 

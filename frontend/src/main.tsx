@@ -9,14 +9,13 @@ class PetHealthPanel extends HTMLElement {
   private _hass: HomeAssistant | null = null;
 
   connectedCallback() {
-    // Create a mount point for React
+    // Create a mount point for React directly in the element (no Shadow DOM)
     const mountPoint = document.createElement('div');
     mountPoint.id = 'react-root';
-    this.attachShadow({ mode: 'open' }).appendChild(mountPoint);
+    this.appendChild(mountPoint);
     
-    // Render React app
+    // Initialize React root
     this.root = ReactDOM.createRoot(mountPoint);
-    this.renderApp();
   }
 
   disconnectedCallback() {
@@ -36,10 +35,10 @@ class PetHealthPanel extends HTMLElement {
   }
 
   private renderApp() {
-    if (this.root) {
+    if (this.root && this._hass) {
       this.root.render(
         <React.StrictMode>
-          <App />
+          <App hass={this._hass} />
         </React.StrictMode>
       );
     }
