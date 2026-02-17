@@ -174,7 +174,19 @@ class PetHealthOptionsFlow(OptionsFlow):
     async def async_step_edit_image(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Edit pet image path."""
+        """Edit pet image path.
+        
+        Args:
+            user_input: Contains pet_image_path field if form submitted, None if showing form.
+        
+        Returns:
+            ConfigFlowResult: Either updates config entry and completes, or shows form.
+            
+        Behavior:
+            - When user_input is None: Displays form with current image path
+            - When user_input has data: Updates config entry with new path and completes
+            - Empty path removes custom image, falling back to defaults
+        """
         if user_input is not None:
             # Update the config entry data
             new_data = dict(self.config_entry.data)
