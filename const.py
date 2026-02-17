@@ -14,6 +14,7 @@ EVENT_PET_HEALTH_DATA_UPDATED = "pet_health_data_updated"
 CONF_PET_TYPE = "pet_type"
 CONF_PET_NAME = "pet_name"
 CONF_PET_ID = "pet_id"
+CONF_PET_IMAGE_PATH = "pet_image_path"
 
 # Options keys
 CONF_MEDICATIONS = "medications"
