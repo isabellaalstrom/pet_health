@@ -131,6 +131,8 @@ async def handle_get_pet_data(
             len(pet_medications),
         )
 
+        # Include fields at both root and in data object for backward compatibility
+        # Frontend accesses entry.data.pet_image_path, while some code may use root-level fields
         entries.append(
             {
                 "entry_id": entry.entry_id,
@@ -138,6 +140,13 @@ async def handle_get_pet_data(
                 "pet_id": entry.data.get("pet_id"),
                 "pet_name": entry.data.get("pet_name"),
                 "pet_type": entry.data.get("pet_type"),
+                "pet_image_path": entry.data.get("pet_image_path"),
+                "data": {
+                    "pet_id": entry.data.get("pet_id"),
+                    "pet_name": entry.data.get("pet_name"),
+                    "pet_type": entry.data.get("pet_type"),
+                    "pet_image_path": entry.data.get("pet_image_path"),
+                },
                 "medications": pet_medications,
             }
         )
