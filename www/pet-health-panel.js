@@ -425,17 +425,57 @@ class PetHealthPanel extends HTMLElement {
         }
 
         .pet-selector {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
           margin: 16px 0;
+          justify-content: center;
         }
 
-        .pet-selector select {
-          width: 100%;
-          padding: 12px;
-          font-size: 16px;
-          border: 1px solid var(--divider-color);
-          border-radius: 4px;
-          background: var(--primary-background-color);
+        .pet-button {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 16px;
+          border: 2px solid var(--divider-color);
+          border-radius: 12px;
+          background: var(--card-background-color);
           color: var(--primary-text-color);
+          cursor: pointer;
+          transition: all 0.2s;
+          min-width: 100px;
+        }
+
+        .pet-button:hover {
+          border-color: var(--primary-color);
+          background: var(--secondary-background-color);
+        }
+
+        .pet-button.selected {
+          border-color: var(--primary-color);
+          background: var(--primary-color);
+          color: var(--text-primary-color);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .pet-button-image {
+          width: 64px;
+          height: 64px;
+          border-radius: 50%;
+          object-fit: cover;
+          background: var(--primary-background-color);
+          border: 2px solid var(--divider-color);
+        }
+
+        .pet-button.selected .pet-button-image {
+          border-color: var(--text-primary-color);
+        }
+
+        .pet-button-name {
+          font-size: 14px;
+          font-weight: 500;
+          text-align: center;
         }
 
         .navigation {
@@ -576,13 +616,20 @@ class PetHealthPanel extends HTMLElement {
             </div>
           ` : `
             <div class="pet-selector">
-              <select id="pet-select">
-                ${pets.map(pet => `
-                  <option value="${pet.entry_id}" ${pet.entry_id === this._selectedPetId ? 'selected' : ''}>
-                    ${this.getPetIcon(pet.type)} ${pet.name}
-                  </option>
-                `).join('')}
-              </select>
+              ${pets.map(pet => `
+                <button 
+                  class="pet-button ${pet.entry_id === this._selectedPetId ? 'selected' : ''}"
+                  data-pet-id="${pet.entry_id}"
+                  data-pet-type="${pet.type}"
+                >
+                  <img 
+                    class="pet-button-image" 
+                    src="${this.getPetImageUrl(pet)}" 
+                    alt="${pet.name}"
+                  />
+                  <span class="pet-button-name">${pet.name}</span>
+                </button>
+              `).join('')}
             </div>
 
             <div class="navigation">
@@ -1627,7 +1674,9 @@ class PetHealthPanel extends HTMLElement {
     return this._configEntries.map(entry => ({
       entry_id: entry.entry_id,
       name: entry.title,
-      type: entry.data?.pet_type || 'other'
+      type: entry.data?.pet_type || 'other',
+      pet_image_path: entry.data?.pet_image_path,
+      data: entry.data
     }));
   }
 
@@ -1643,6 +1692,32 @@ class PetHealthPanel extends HTMLElement {
       'other': '🐾'
     };
     return icons[type] || icons.other;
+  }
+
+  getDefaultPetImageUrl(type) {
+    const typeMap = {
+      'cat': 'default-cat.svg',
+      'dog': 'default-dog.svg',
+      'other': 'default-other.svg'
+    };
+    const filename = typeMap[type] || 'default-other.svg';
+    return `/pet_health_panel/${filename}`;
+  }
+
+  getPetImageUrl(pet) {
+    // Check if pet has a custom image path configured
+    const imagePath = pet.pet_image_path;
+    
+    if (imagePath) {
+      // If it's a relative path (doesn't start with / or http), treat it as www relative
+      if (!imagePath.startsWith('/') && !imagePath.startsWith('http')) {
+        return `/local/${imagePath}`;
+      }
+      return imagePath;
+    }
+    
+    // Fall back to default image based on pet type
+    return this.getDefaultPetImageUrl(pet.type);
   }
 
   getPetSensors(entryId) {
@@ -1685,14 +1760,25 @@ class PetHealthPanel extends HTMLElement {
   }
 
   attachEventListeners() {
-    // Pet selector
-    const petSelect = this.querySelector('#pet-select');
-    if (petSelect) {
-      petSelect.addEventListener('change', (e) => {
-        this._selectedPetId = e.target.value;
-        this.render();
+    // Pet selector buttons
+    this.querySelectorAll('.pet-button').forEach(button => {
+      button.addEventListener('click', (e) => {
+        const petId = button.dataset.petId;
+        if (petId) {
+          this._selectedPetId = petId;
+          this.render();
+        }
       });
-    }
+      
+      // Handle image load errors
+      const img = button.querySelector('.pet-button-image');
+      if (img) {
+        img.addEventListener('error', () => {
+          const petType = button.dataset.petType || 'other';
+          img.src = this.getDefaultPetImageUrl(petType);
+        });
+      }
+    });
 
     // Navigation buttons
     this.querySelectorAll('.nav-button').forEach(button => {

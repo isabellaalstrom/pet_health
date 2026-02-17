@@ -38,6 +38,7 @@ from .const import (
     CONF_MEDICATION_UNIT,
     CONF_MEDICATIONS,
     CONF_PET_ID,
+    CONF_PET_IMAGE_PATH,
     CONF_PET_NAME,
     CONF_PET_TYPE,
     DOMAIN,
@@ -130,8 +131,89 @@ class PetHealthOptionsFlow(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Manage medications."""
-        return await self.async_step_medication_list()
+        """Show main menu.
+        
+        Args:
+            user_input: User's selected action from the menu, or None if showing form.
+        
+        Returns:
+            ConfigFlowResult: Either a form to display the menu or navigation to next step.
+        
+        Menu actions:
+            - edit_image: Navigate to edit pet image path
+            - medications: Navigate to medication management
+            - done: Complete configuration
+        """
+        if user_input is not None:
+            action = user_input.get("action")
+            if action == "edit_image":
+                return await self.async_step_edit_image()
+            if action == "medications":
+                return await self.async_step_medication_list()
+            return self.async_create_entry(title="", data={})
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("action"): SelectSelector(
+                        SelectSelectorConfig(
+                            options=[
+                                {"label": "Edit pet image", "value": "edit_image"},
+                                {"label": "Manage medications", "value": "medications"},
+                                {"label": "Done", "value": "done"},
+                            ],
+                            mode=SelectSelectorMode.LIST,
+                        )
+                    )
+                }
+            ),
+            description_placeholders={"pet_name": self.config_entry.title},
+        )
+
+    async def async_step_edit_image(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Edit pet image path.
+        
+        Args:
+            user_input: Contains pet_image_path field if form submitted, None if showing form.
+        
+        Returns:
+            ConfigFlowResult: Either updates config entry and completes, or shows form.
+            
+        Behavior:
+            - When user_input is None: Displays form with current image path
+            - When user_input has data: Updates config entry with new path and completes
+            - Empty path removes custom image, falling back to defaults
+        """
+        if user_input is not None:
+            # Update the config entry data
+            new_data = dict(self.config_entry.data)
+            image_path = user_input.get(CONF_PET_IMAGE_PATH, "").strip()
+            if image_path:
+                new_data[CONF_PET_IMAGE_PATH] = image_path
+            elif CONF_PET_IMAGE_PATH in new_data:
+                del new_data[CONF_PET_IMAGE_PATH]
+
+            self.hass.config_entries.async_update_entry(
+                self.config_entry, data=new_data
+            )
+            return self.async_create_entry(title="", data={})
+
+        current_image_path = self.config_entry.data.get(CONF_PET_IMAGE_PATH, "")
+
+        return self.async_show_form(
+            step_id="edit_image",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_PET_IMAGE_PATH, default=current_image_path
+                    ): TextSelector(),
+                }
+            ),
+            description_placeholders={"pet_name": self.config_entry.title},
+        )
 
     async def async_step_medication_list(
         self, user_input: dict[str, Any] | None = None

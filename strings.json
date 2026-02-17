@@ -25,6 +25,20 @@
   },
   "options": {
     "step": {
+      "init": {
+        "title": "Configure {pet_name}",
+        "description": "Choose what to configure",
+        "data": {
+          "action": "Action"
+        }
+      },
+      "edit_image": {
+        "title": "Edit pet image",
+        "description": "Specify a custom image path for {pet_name}. Leave empty to use default image. The path should be relative to your Home Assistant www directory (e.g., 'images/my_cat.jpg' for www/images/my_cat.jpg) or an absolute path accessible by Home Assistant.",
+        "data": {
+          "pet_image_path": "Image path"
+        }
+      },
       "medication_list": {
         "title": "Manage medications for {pet_name}",
         "description": "Add, edit, or remove medications",
