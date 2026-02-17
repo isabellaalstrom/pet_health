@@ -1700,7 +1700,7 @@ class PetHealthPanel extends HTMLElement {
       'dog': 'default-dog.svg',
       'other': 'default-other.svg'
     };
-    const filename = typeMap[type] || typeMap.other;
+    const filename = typeMap[type] || 'default-other.svg';
     return `/pet_health_panel/${filename}`;
   }
 
@@ -1763,8 +1763,11 @@ class PetHealthPanel extends HTMLElement {
     // Pet selector buttons
     this.querySelectorAll('.pet-button').forEach(button => {
       button.addEventListener('click', (e) => {
-        this._selectedPetId = button.dataset.petId;
-        this.render();
+        const petId = button.dataset.petId;
+        if (petId) {
+          this._selectedPetId = petId;
+          this.render();
+        }
       });
     });
 
