@@ -215,6 +215,50 @@ After enabling debug, check the Home Assistant logs (Settings → System → Log
 
 ## Development
 
+### Release Process
+
+This project uses GitHub Actions to automate releases. There are two ways to create a release:
+
+#### 1. Manual Release (Recommended)
+
+1. Go to the [Actions tab](../../actions/workflows/release.yml) in GitHub
+2. Click "Run workflow"
+3. Enter the new version number (e.g., `0.3.1`)
+4. Click "Run workflow"
+
+The workflow will:
+- Update version numbers in `manifest.json`, `hacs.json`, and `frontend/package.json`
+- Build the React frontend
+- Commit the changes to main
+- Create a git tag
+- Generate release notes from commits
+- Create a GitHub release with a downloadable zip
+
+#### 2. Release via Pull Request
+
+1. Create a PR with your changes
+2. Add the `release` label to the PR
+3. Merge the PR to main
+
+The workflow will automatically:
+- Use the current version from `manifest.json`
+- Build the React frontend
+- Create a git tag
+- Generate release notes
+- Create a GitHub release
+
+### Frontend Development
+
+The React frontend must be built before releases. The GitHub Actions workflow handles this automatically, but for local development:
+
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+This compiles the React application and outputs `pet-health-panel.js` to the `www/` directory.
+
 - Code structure highlights:
   - `manifest.json` — integration metadata
   - `config_flow.py` — UI setup flow

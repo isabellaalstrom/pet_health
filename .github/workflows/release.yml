@@ -1,0 +1,171 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 0.3.1)'
+        required: true
+        type: string
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+jobs:
+  release:
+    # Only run on merged PRs or manual dispatch
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      (github.event.pull_request.merged == true && 
+       contains(github.event.pull_request.labels.*.name, 'release'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for proper release notes
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            # Extract version from manifest.json
+            VERSION=$(grep -oP '"version":\s*"\K[^"]+' manifest.json)
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Determined version: $VERSION"
+      
+      - name: Update version in manifest files
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          # Update manifest.json
+          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" manifest.json
+          # Update hacs.json
+          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" hacs.json
+          # Update frontend package.json
+          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" frontend/package.json
+          
+          # Show the changes
+          echo "=== Updated manifest.json ==="
+          grep version manifest.json
+          echo "=== Updated hacs.json ==="
+          grep version hacs.json
+          echo "=== Updated frontend/package.json ==="
+          grep version frontend/package.json
+      
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+      
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+          
+          # Verify build output
+          if [ ! -f ../www/pet-health-panel.js ]; then
+            echo "Error: Build did not produce expected output!"
+            exit 1
+          fi
+          
+          echo "=== Build complete. Checking output ==="
+          ls -lh ../www/pet-health-panel.js
+      
+      - name: Commit version updates
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Verify build output exists
+          if [ ! -f www/pet-health-panel.js ]; then
+            echo "Error: Build output www/pet-health-panel.js not found!"
+            exit 1
+          fi
+          
+          git add manifest.json hacs.json frontend/package.json www/pet-health-panel.js
+          git commit -m "Release v${{ steps.version.outputs.VERSION }}" || echo "No changes to commit"
+          git push origin main
+      
+      - name: Create Git tag
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+      
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          PREV_TAG=$(git tag --sort=-version:refname | head -n 1 || echo "")
+          
+          if [ -z "$PREV_TAG" ]; then
+            NOTES="## What's Changed\n\nInitial release\n\n## Installation\n\n1. Download the zip file\n2. Extract to your Home Assistant \`custom_components\` directory\n3. Restart Home Assistant\n4. Add the Pet Health integration via Settings → Devices & Services"
+          else
+            NOTES="## What's Changed\n\n"
+            NOTES+=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges)
+            NOTES+="\n\n**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...v$VERSION"
+            NOTES+="\n\n## Installation\n\n1. Download the zip file\n2. Extract to your Home Assistant \`custom_components\` directory\n3. Restart Home Assistant\n4. Add the Pet Health integration via Settings → Devices & Services"
+          fi
+          
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Create release archive
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          mkdir -p release_package
+          
+          # Copy all necessary files
+          cp -r \
+            __init__.py \
+            config_flow.py \
+            const.py \
+            manifest.json \
+            models.py \
+            panel.py \
+            sensor.py \
+            services.yaml \
+            store.py \
+            strings.json \
+            websocket.py \
+            hacs.json \
+            translations \
+            www \
+            release_package/
+          
+          # Create zip file
+          cd release_package
+          zip -r ../pet_health_v${VERSION}.zip .
+          cd ..
+          
+          echo "=== Release archive created ==="
+          ls -lh pet_health_v${VERSION}.zip
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          name: Pet Health v${{ steps.version.outputs.VERSION }}
+          body: ${{ steps.release_notes.outputs.notes }}
+          draft: false
+          prerelease: false
+          files: |
+            pet_health_v${{ steps.version.outputs.VERSION }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
