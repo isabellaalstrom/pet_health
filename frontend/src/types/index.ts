@@ -1,7 +1,7 @@
 // Home Assistant types
 export interface HomeAssistant {
   callWS: <T = unknown>(params: Record<string, unknown>) => Promise<T>;
-  callService: (domain: string, service: string, data?: Record<string, unknown> | object) => Promise<void>;
+  callService: (domain: string, service: string, data?: Record<string, unknown>) => Promise<void>;
   connection: {
     subscribeEvents: (callback: (event: unknown) => void, eventType: string) => Promise<() => void>;
   };
@@ -34,7 +34,7 @@ export interface Visit {
   config_entry_id?: string;
 }
 
-export interface LogBathroomVisitData {
+export interface LogBathroomVisitData extends Record<string, unknown> {
   config_entry_id: string;
   timestamp?: string;
   did_pee?: boolean;
@@ -62,7 +62,7 @@ export interface MedicationLog {
   notes?: string;
 }
 
-export interface LogMedicationData {
+export interface LogMedicationData extends Record<string, unknown> {
   config_entry_id: string;
   medication_id: string;
   timestamp?: string;
@@ -71,7 +71,7 @@ export interface LogMedicationData {
   notes?: string;
 }
 
-export interface AmendVisitData {
+export interface AmendVisitData extends Record<string, unknown> {
   did_pee?: boolean;
   did_poop?: boolean;
   consistency?: string;

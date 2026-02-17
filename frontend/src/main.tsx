@@ -1,11 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import type { HomeAssistant } from './types';
 
 // Create a Web Component wrapper for Home Assistant integration
 class PetHealthPanel extends HTMLElement {
   private root: ReactDOM.Root | null = null;
-  private _hass: any = null;
+  private _hass: HomeAssistant | null = null;
 
   connectedCallback() {
     // Create a mount point for React
@@ -25,12 +26,12 @@ class PetHealthPanel extends HTMLElement {
     }
   }
 
-  set hass(hass: any) {
+  set hass(hass: HomeAssistant) {
     this._hass = hass;
     this.renderApp();
   }
 
-  get hass() {
+  get hass(): HomeAssistant | null {
     return this._hass;
   }
 
