@@ -138,6 +138,13 @@ async def handle_get_pet_data(
                 "pet_id": entry.data.get("pet_id"),
                 "pet_name": entry.data.get("pet_name"),
                 "pet_type": entry.data.get("pet_type"),
+                "pet_image_path": entry.data.get("pet_image_path"),
+                "data": {
+                    "pet_id": entry.data.get("pet_id"),
+                    "pet_name": entry.data.get("pet_name"),
+                    "pet_type": entry.data.get("pet_type"),
+                    "pet_image_path": entry.data.get("pet_image_path"),
+                },
                 "medications": pet_medications,
             }
         )
