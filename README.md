@@ -4,7 +4,34 @@ IN DEVELOPMENT - integration will possibly change rapidly without warning and no
 
 > Home Assistant integration to track and log your pet's bathroom visits, meals, drinks, medications and overall wellbeing.
 
-Version: 0.1.0
+Version: 0.3.0
+
+## Frontend Development
+
+The Pet Health panel is now built with React for better maintainability and modularity. The frontend source code is in the `frontend/` directory.
+
+### Building the Frontend
+
+To build the frontend panel:
+
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+This will compile the React application and output the bundled `pet-health-panel.js` to the `www/` directory.
+
+### Development Mode
+
+For development with hot-reload:
+
+```bash
+cd frontend
+npm run dev
+```
+
+Note: Development mode is primarily for working on the React components. For full integration testing, you'll need to build and test within Home Assistant.
 
 ## Overview
 
