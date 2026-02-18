@@ -8,6 +8,43 @@ interface AppProps {
   hass: HomeAssistant;
 }
 
+// Add global responsive styles
+const globalStyles = `
+  @media (max-width: 768px) {
+    .mobile-table-row {
+      display: flex !important;
+      flex-direction: column !important;
+      border-bottom: 2px solid #e0e0e0 !important;
+      padding: 12px !important;
+      gap: 8px !important;
+    }
+
+    .mobile-table-row > td {
+      display: flex !important;
+      justify-content: space-between !important;
+      padding: 4px 0 !important;
+      border: none !important;
+    }
+
+    .mobile-table-row > td::before {
+      content: attr(data-label);
+      font-weight: 600;
+      color: #666;
+      margin-right: 12px;
+    }
+
+    .mobile-hide-header thead {
+      display: none !important;
+    }
+
+    .mobile-compact {
+      padding: 8px 12px !important;
+      font-size: 13px !important;
+    }
+  }
+`;
+
+
 const styles: Record<string, CSSProperties> = {
   container: {
     maxWidth: '1400px',
@@ -16,6 +53,9 @@ const styles: Record<string, CSSProperties> = {
     minHeight: '100vh',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   },
+  containerMobile: {
+    padding: '12px',
+  },
   header: {
     background: '#ffffff',
     borderRadius: '12px',
@@ -23,11 +63,19 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: '24px',
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
   },
+  headerMobile: {
+    padding: '16px',
+    marginBottom: '16px',
+  },
   h1: {
     margin: '0 0 24px 0',
     fontSize: '32px',
     fontWeight: 700,
     color: '#212121',
+  },
+  h1Mobile: {
+    fontSize: '24px',
+    marginBottom: '16px',
   },
   petSelector: {
     display: 'flex',
@@ -35,6 +83,10 @@ const styles: Record<string, CSSProperties> = {
     flexWrap: 'wrap' as const,
     margin: '16px 0',
     justifyContent: 'center',
+  },
+  petSelectorMobile: {
+    gap: '10px',
+    margin: '12px 0',
   },
   petButton: {
     display: 'flex',
@@ -50,12 +102,22 @@ const styles: Record<string, CSSProperties> = {
     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
     minWidth: '110px',
   },
+  petButtonMobile: {
+    padding: '10px 12px',
+    gap: '6px',
+    border: '2px solid #e0e0e0',
+    borderRadius: '8px',
+    minWidth: '80px',
+  },
   petButtonSelected: {
     border: '3px solid #03a9f4',
     background: '#03a9f4',
     color: '#ffffff',
     boxShadow: '0 4px 12px rgba(3, 169, 244, 0.3)',
     transform: 'translateY(-2px)',
+  },
+  petButtonSelectedMobile: {
+    border: '2px solid #03a9f4',
   },
   petImage: {
     width: '72px',
@@ -64,14 +126,25 @@ const styles: Record<string, CSSProperties> = {
     objectFit: 'cover' as const,
     border: '3px solid #e0e0e0',
   },
+  petImageMobile: {
+    width: '48px',
+    height: '48px',
+    border: '2px solid #e0e0e0',
+  },
   petImageSelected: {
     borderColor: '#ffffff',
     boxShadow: '0 0 0 3px rgba(255, 255, 255, 0.2)',
+  },
+  petImageSelectedMobile: {
+    boxShadow: '0 0 0 2px rgba(255, 255, 255, 0.2)',
   },
   petName: {
     fontSize: '14px',
     fontWeight: 600,
     textAlign: 'center' as const,
+  },
+  petNameMobile: {
+    fontSize: '12px',
   },
   navigation: {
     display: 'flex',
@@ -83,6 +156,11 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: '12px',
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
   },
+  navigationMobile: {
+    gap: '8px',
+    padding: '8px',
+    marginBottom: '16px',
+  },
   navButton: {
     padding: '14px 28px',
     border: 'none',
@@ -93,6 +171,10 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '15px',
     fontWeight: 500,
     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+  },
+  navButtonMobile: {
+    padding: '10px 16px',
+    fontSize: '13px',
   },
   navButtonActive: {
     background: '#03a9f4',
@@ -106,6 +188,11 @@ const styles: Record<string, CSSProperties> = {
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
     marginBottom: '24px',
   },
+  cardMobile: {
+    padding: '16px',
+    marginBottom: '16px',
+    borderRadius: '8px',
+  },
   h2: {
     margin: '0 0 24px 0',
     fontSize: '22px',
@@ -114,11 +201,20 @@ const styles: Record<string, CSSProperties> = {
     paddingBottom: '12px',
     borderBottom: '2px solid #e0e0e0',
   },
+  h2Mobile: {
+    fontSize: '18px',
+    margin: '0 0 16px 0',
+    paddingBottom: '8px',
+  },
   h3: {
     margin: '24px 0 16px 0',
     fontSize: '18px',
     fontWeight: 600,
     color: '#212121',
+  },
+  h3Mobile: {
+    fontSize: '16px',
+    margin: '16px 0 12px 0',
   },
   stats: {
     display: 'grid',
@@ -154,6 +250,10 @@ const styles: Record<string, CSSProperties> = {
     flexWrap: 'wrap' as const,
     marginTop: '16px',
   },
+  actionButtonsMobile: {
+    gap: '12px',
+    marginTop: '12px',
+  },
   actionButton: {
     padding: '14px 32px',
     border: 'none',
@@ -168,11 +268,20 @@ const styles: Record<string, CSSProperties> = {
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
   },
+  actionButtonMobile: {
+    padding: '12px 20px',
+    fontSize: '13px',
+    width: '100%',
+  },
   table: {
     width: '100%',
     borderCollapse: 'separate' as const,
     borderSpacing: 0,
     marginTop: '24px',
+  },
+  tableMobile: {
+    marginTop: '16px',
+    display: 'block',
   },
   th: {
     padding: '16px',
@@ -185,12 +294,20 @@ const styles: Record<string, CSSProperties> = {
     letterSpacing: '0.5px',
     borderBottom: '1px solid #e0e0e0',
   },
+  thMobile: {
+    padding: '10px',
+    fontSize: '11px',
+  },
   td: {
     padding: '16px',
     textAlign: 'left' as const,
     color: '#727272',
     fontSize: '14px',
     borderBottom: '1px solid #e0e0e0',
+  },
+  tdMobile: {
+    padding: '10px',
+    fontSize: '13px',
   },
   smallButton: {
     padding: '6px 10px',
@@ -202,7 +319,11 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '16px',
     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
     minWidth: '32px',
-    marginRight: '6px',
+  },
+  smallButtonMobile: {
+    padding: '8px 12px',
+    fontSize: '14px',
+    minWidth: '40px',
   },
   dialogOverlay: {
     position: 'fixed' as const,
@@ -308,6 +429,9 @@ function App({ hass }: AppProps) {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const { visits, reload: reloadVisits } = useVisits(api, selectedPetId);
 
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+
   // Additional state for missing functionality
   const [unknownVisits, setUnknownVisits] = useState<Visit[]>([]);
   const [medications, setMedications] = useState<MedicationLog[]>([]);
@@ -339,6 +463,18 @@ function App({ hass }: AppProps) {
       setSelectedPetId(pets[0].entry_id);
     }
   }, [pets, selectedPetId]);
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Load store data when pet changes
   useEffect(() => {
@@ -609,29 +745,43 @@ function App({ hass }: AppProps) {
     }
   };
 
-  return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.h1}>🐾 Pet Health</h1>
+  // Helper to merge mobile styles
+  const s = (key: string) => {
+    const mobileKey = `${key}Mobile`;
+    return isMobile && styles[mobileKey]
+      ? { ...styles[key], ...styles[mobileKey] }
+      : styles[key];
+  };
 
-        <div style={styles.petSelector}>
-          {pets.map(pet => (
-            <div key={pet.entry_id} style={styles.badgeContainer}>
-              <button
-                style={pet.entry_id === selectedPetId ? {...styles.petButton, ...styles.petButtonSelected} : styles.petButton}
-                onClick={() => setSelectedPetId(pet.entry_id)}
-              >
-                <img
-                  src={getPetImageUrl(pet)}
-                  alt={getPetName(pet)}
-                  style={pet.entry_id === selectedPetId ? {...styles.petImage, ...styles.petImageSelected} : styles.petImage}
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = '/pet_health_panel/default-other.svg';
-                  }}
-                />
-                <span style={styles.petName}>{getPetName(pet)}</span>
-              </button>
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
+      <div style={{...styles.container, ...(isMobile ? styles.containerMobile : {})}}>
+        <div style={{...styles.header, ...(isMobile ? styles.headerMobile : {})}}>
+          <h1 style={{...styles.h1, ...(isMobile ? styles.h1Mobile : {})}}>🐾 Pet Health</h1>
+
+          <div style={{...styles.petSelector, ...(isMobile ? styles.petSelectorMobile : {})}}>
+            {pets.map(pet => (
+              <div key={pet.entry_id} style={styles.badgeContainer}>
+                <button
+                  style={pet.entry_id === selectedPetId
+                    ? {...s('petButton'), ...s('petButtonSelected')}
+                    : s('petButton')}
+                  onClick={() => setSelectedPetId(pet.entry_id)}
+                >
+                  <img
+                    src={getPetImageUrl(pet)}
+                    alt={getPetName(pet)}
+                    style={pet.entry_id === selectedPetId
+                      ? {...s('petImage'), ...s('petImageSelected')}
+                      : s('petImage')}
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = '/pet_health_panel/default-other.svg';
+                    }}
+                  />
+                  <span style={s('petName')}>{getPetName(pet)}</span>
+                </button>
               {hasAlerts(pet.entry_id) && (
                 <div style={styles.badge}>!</div>
               )}
@@ -640,16 +790,20 @@ function App({ hass }: AppProps) {
         </div>
       </div>
 
-      <div style={styles.navigation}>
+      <div style={{...styles.navigation, ...(isMobile ? styles.navigationMobile : {})}}>
         <button
-          style={currentView === 'dashboard' ? {...styles.navButton, ...styles.navButtonActive} : styles.navButton}
+          style={currentView === 'dashboard'
+            ? {...s('navButton'), ...styles.navButtonActive}
+            : s('navButton')}
           onClick={() => setCurrentView('dashboard')}
         >
           Dashboard
         </button>
         <div style={styles.badgeContainer}>
           <button
-            style={currentView === 'visits' ? {...styles.navButton, ...styles.navButtonActive} : styles.navButton}
+            style={currentView === 'visits'
+              ? {...s('navButton'), ...styles.navButtonActive}
+              : s('navButton')}
             onClick={() => setCurrentView('visits')}
           >
             Bathroom Visits
@@ -661,19 +815,25 @@ function App({ hass }: AppProps) {
           )}
         </div>
         <button
-          style={currentView === 'medications' ? {...styles.navButton, ...styles.navButtonActive} : styles.navButton}
+          style={currentView === 'medications'
+            ? {...s('navButton'), ...styles.navButtonActive}
+            : s('navButton')}
           onClick={() => setCurrentView('medications')}
         >
           Medications
         </button>
         <button
-          style={currentView === 'health' ? {...styles.navButton, ...styles.navButtonActive} : styles.navButton}
+          style={currentView === 'health'
+            ? {...s('navButton'), ...styles.navButtonActive}
+            : s('navButton')}
           onClick={() => setCurrentView('health')}
         >
           Health
         </button>
         <button
-          style={currentView === 'nutrition' ? {...styles.navButton, ...styles.navButtonActive} : styles.navButton}
+          style={currentView === 'nutrition'
+            ? {...s('navButton'), ...styles.navButtonActive}
+            : s('navButton')}
           onClick={() => setCurrentView('nutrition')}
         >
           Nutrition
@@ -681,9 +841,9 @@ function App({ hass }: AppProps) {
       </div>
 
       {currentView === 'dashboard' && selectedPet && (
-        <div style={{display: "flex", flexDirection: "column", gap: "24px"}}>
-          <div style={styles.card}>
-            <h2 style={styles.h2}>Dashboard for {getPetName(selectedPet)}</h2>
+        <div style={{display: "flex", flexDirection: "column", gap: isMobile ? "16px" : "24px"}}>
+          <div style={s('card')}>
+            <h2 style={s('h2')}>Dashboard for {getPetName(selectedPet)}</h2>
             <div style={styles.stats}>
               <div style={styles.statCard}>
                 <div style={styles.statLabel}>Total Visits</div>
@@ -706,11 +866,11 @@ function App({ hass }: AppProps) {
                 </div>
               )}
             </div>
-            <div style={styles.actionButtons}>
-              <button style={styles.actionButton} onClick={handleLogVisit}>
+            <div style={s('actionButtons')}>
+              <button style={s('actionButton')} onClick={handleLogVisit}>
                 Log Bathroom Visit
               </button>
-              <button style={styles.actionButton} onClick={handleLogMedication}>
+              <button style={s('actionButton')} onClick={handleLogMedication}>
                 Log Medication
               </button>
             </div>
@@ -719,31 +879,31 @@ function App({ hass }: AppProps) {
       )}
 
       {currentView === 'visits' && selectedPet && (
-        <div style={{display: "flex", flexDirection: "column", gap: "24px"}}>
+        <div style={{display: "flex", flexDirection: "column", gap: isMobile ? "16px" : "24px"}}>
           {unknownVisits.length > 0 && (
-            <div style={styles.card}>
-              <h2 style={styles.h2}>⚠️ Unknown Visits (Need Assignment)</h2>
-              <div style={{marginTop: "24px", overflowX: "auto"}}>
-                <table style={styles.table}>
+            <div style={s('card')}>
+              <h2 style={s('h2')}>⚠️ Unknown Visits (Need Assignment)</h2>
+              <div style={{marginTop: isMobile ? "16px" : "24px", overflowX: "auto"}}>
+                <table style={s('table')} className={isMobile ? "mobile-hide-header" : ""}>
                   <thead>
                     <tr>
-                      <th style={styles.th}>Time</th>
-                      <th style={styles.th}>Pee</th>
-                      <th style={styles.th}>Poop</th>
-                      <th style={styles.th}>Notes</th>
-                      <th style={styles.th}>Assign To</th>
+                      <th style={s('th')}>Time</th>
+                      <th style={s('th')}>Pee</th>
+                      <th style={s('th')}>Poop</th>
+                      <th style={s('th')}>Notes</th>
+                      <th style={s('th')}>Assign To</th>
                     </tr>
                   </thead>
                   <tbody>
                     {unknownVisits.map(visit => (
-                      <tr key={visit.visit_id} style={{background: '#fff3e0'}}>
-                        <td style={styles.td}>{formatTimestamp(visit.timestamp)}</td>
-                        <td style={styles.td}>{visit.did_pee ? '✓' : ''}</td>
-                        <td style={styles.td}>{visit.did_poop ? '✓' : ''}</td>
-                        <td style={styles.td}>{visit.notes || ''}</td>
-                        <td style={styles.td}>
+                      <tr key={visit.visit_id} style={{background: '#fff3e0'}} className={isMobile ? "mobile-table-row" : ""}>
+                        <td style={s('td')} data-label="Time">{formatTimestamp(visit.timestamp)}</td>
+                        <td style={s('td')} data-label="Pee">{visit.did_pee ? '✓' : ''}</td>
+                        <td style={s('td')} data-label="Poop">{visit.did_poop ? '✓' : ''}</td>
+                        <td style={s('td')} data-label="Notes">{visit.notes || ''}</td>
+                        <td style={s('td')} data-label="Assign To">
                           <select
-                            style={{padding: '8px', borderRadius: '6px', border: '2px solid #ff9800'}}
+                            style={{padding: isMobile ? '10px' : '8px', borderRadius: '6px', border: '2px solid #ff9800', width: isMobile ? '100%' : 'auto'}}
                             onChange={(e) => {
                               if (e.target.value) {
                                 handleReassignVisit(visit.visit_id, e.target.value);
@@ -767,56 +927,56 @@ function App({ hass }: AppProps) {
             </div>
           )}
 
-          <div style={styles.card}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px'}}>
-              <h2 style={{...styles.h2, margin: 0, border: 'none', paddingBottom: 0}}>Bathroom Visits for {getPetName(selectedPet)}</h2>
+          <div style={s('card')}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? '16px' : '24px', flexWrap: 'wrap', gap: '12px'}}>
+              <h2 style={{...s('h2'), margin: 0, border: 'none', paddingBottom: 0}}>Bathroom Visits for {getPetName(selectedPet)}</h2>
               {visits.filter(v => !v.confirmed).length > 0 && (
-                <div style={{color: '#f44336', fontWeight: 600, fontSize: '14px'}}>
+                <div style={{color: '#f44336', fontWeight: 600, fontSize: isMobile ? '12px' : '14px'}}>
                   {visits.filter(v => !v.confirmed).length} unconfirmed
                 </div>
               )}
             </div>
-            <button style={styles.actionButton} onClick={handleLogVisit}>
+            <button style={s('actionButton')} onClick={handleLogVisit}>
               Log New Visit
             </button>
 
             {visits.length === 0 ? (
               <p>No visits recorded yet.</p>
             ) : (
-              <div style={{marginTop: "24px", overflowX: "auto"}}>
-                <table style={styles.table}>
+              <div style={{marginTop: isMobile ? "16px" : "24px", overflowX: "auto"}}>
+                <table style={s('table')} className={isMobile ? "mobile-hide-header" : ""}>
                   <thead>
                     <tr>
-                      <th style={styles.th}>Time</th>
-                      <th style={styles.th}>Pee</th>
-                      <th style={styles.th}>Poop</th>
-                      <th style={styles.th}>Consistency</th>
-                      <th style={styles.th}>Color</th>
-                      <th style={styles.th}>Urine Amount</th>
-                      <th style={styles.th}>Notes</th>
-                      <th style={styles.th}>Confirmed</th>
-                      <th style={styles.th}>Actions</th>
+                      <th style={s('th')}>Time</th>
+                      <th style={s('th')}>Pee</th>
+                      <th style={s('th')}>Poop</th>
+                      <th style={s('th')}>Consistency</th>
+                      <th style={s('th')}>Color</th>
+                      <th style={s('th')}>Urine Amount</th>
+                      <th style={s('th')}>Notes</th>
+                      <th style={s('th')}>Confirmed</th>
+                      <th style={s('th')}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {visits.slice(0, 50).map(visit => (
-                      <tr key={visit.visit_id} style={!visit.confirmed ? {background: '#ffebee'} : undefined}>
-                        <td style={styles.td}>{formatTimestamp(visit.timestamp)}</td>
-                        <td style={styles.td}>{visit.did_pee ? '✓' : ''}</td>
-                        <td style={styles.td}>{visit.did_poop ? '✓' : ''}</td>
-                        <td style={styles.td}>{visit.poop_consistencies || ''}</td>
-                        <td style={styles.td}>{visit.poop_color || ''}</td>
-                        <td style={styles.td}>{visit.urine_amount || ''}</td>
-                        <td style={styles.td}>{visit.notes || ''}</td>
-                        <td style={styles.td}>
+                      <tr key={visit.visit_id} style={!visit.confirmed ? {background: '#ffebee'} : undefined} className={isMobile ? "mobile-table-row" : ""}>
+                        <td style={s('td')} data-label="Time">{formatTimestamp(visit.timestamp)}</td>
+                        <td style={s('td')} data-label="Pee">{visit.did_pee ? '✓' : ''}</td>
+                        <td style={s('td')} data-label="Poop">{visit.did_poop ? '✓' : ''}</td>
+                        <td style={s('td')} data-label="Consistency">{visit.poop_consistencies || ''}</td>
+                        <td style={s('td')} data-label="Color">{visit.poop_color || ''}</td>
+                        <td style={s('td')} data-label="Urine Amount">{visit.urine_amount || ''}</td>
+                        <td style={s('td')} data-label="Notes">{visit.notes || ''}</td>
+                        <td style={s('td')} data-label="Confirmed">
                           {visit.confirmed ? '✓' : <span style={styles.unconfirmedMark}>?</span>}
                         </td>
-                        <td style={styles.td}>
+                        <td style={s('td')} data-label="Actions">
                           <div style={{display: "flex", flexDirection: "column", gap: "6px"}}>
-                            <div style={{display: "flex", gap: "6px"}}>
+                            <div style={{display: "flex", gap: "6px", flexWrap: "wrap"}}>
                               {!visit.confirmed && (
                                 <button
-                                  style={styles.smallButton}
+                                  style={s('smallButton')}
                                   onClick={() => handleConfirmVisit(visit.visit_id)}
                                   title="Confirm"
                                 >
@@ -824,14 +984,14 @@ function App({ hass }: AppProps) {
                                 </button>
                               )}
                               <button
-                                style={styles.smallButton}
+                                style={s('smallButton')}
                                 onClick={() => handleAmendVisit(visit)}
                                 title="Amend"
                               >
                                 ✏️
                               </button>
                               <button
-                                style={styles.smallButton}
+                                style={s('smallButton')}
                                 onClick={() => handleDeleteVisit(visit.visit_id)}
                                 title="Delete"
                               >
@@ -840,7 +1000,7 @@ function App({ hass }: AppProps) {
                             </div>
                             {!visit.confirmed && (
                               <select
-                                style={{padding: '6px', borderRadius: '4px', border: '2px solid #f44336', fontSize: '12px'}}
+                                style={{padding: isMobile ? '8px' : '6px', borderRadius: '4px', border: '2px solid #f44336', fontSize: isMobile ? '13px' : '12px', width: isMobile ? '100%' : 'auto'}}
                                 onChange={(e) => {
                                   if (e.target.value) {
                                     handleReassignVisit(visit.visit_id, e.target.value);
@@ -1375,7 +1535,8 @@ function App({ hass }: AppProps) {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 
