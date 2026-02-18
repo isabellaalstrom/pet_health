@@ -13,9 +13,12 @@ class PetHealthPanel extends HTMLElement {
     const mountPoint = document.createElement('div');
     mountPoint.id = 'react-root';
     this.appendChild(mountPoint);
-    
-    // Initialize React root
+
+    // Initialize React root and render once
     this.root = ReactDOM.createRoot(mountPoint);
+    if (this._hass) {
+      this.renderApp();
+    }
   }
 
   disconnectedCallback() {
@@ -27,7 +30,11 @@ class PetHealthPanel extends HTMLElement {
 
   set hass(hass: HomeAssistant) {
     this._hass = hass;
-    this.renderApp();
+
+    // Only render if we haven't rendered yet
+    if (this.root && !this.querySelector('#react-root > *')) {
+      this.renderApp();
+    }
   }
 
   get hass(): HomeAssistant | null {

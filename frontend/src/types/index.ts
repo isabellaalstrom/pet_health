@@ -24,10 +24,11 @@ export interface PetEntry {
 export interface Visit {
   visit_id: string;
   timestamp: string;
+  pet_id?: string;
   did_pee?: boolean;
   did_poop?: boolean;
-  consistency?: string;
-  color?: string;
+  poop_consistencies?: string;  // API returns this field name
+  poop_color?: string;  // API returns this field name
   urine_amount?: number;
   notes?: string;
   confirmed?: boolean;
@@ -39,8 +40,8 @@ export interface LogBathroomVisitData extends Record<string, unknown> {
   timestamp?: string;
   did_pee?: boolean;
   did_poop?: boolean;
-  consistency?: string;
-  color?: string;
+  consistency?: string;  // Service accepts this field name
+  color?: string;  // Service accepts this field name
   urine_amount?: number;
   notes?: string;
   confirmed?: boolean;
@@ -56,7 +57,8 @@ export interface Medication {
 
 export interface MedicationLog {
   timestamp: string;
-  medication_id: string;
+  pet_id?: string;
+  medication_name: string;  // API returns this field name
   dosage?: string;
   unit?: string;
   notes?: string;

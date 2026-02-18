@@ -244,3 +244,107 @@ body, html {
 .visits-table tr:hover {
   background: var(--secondary-background-color);
 }
+/* Dialog styles */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog {
+  background: var(--card-background-color);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.dialog h2 {
+  margin: 0 0 20px 0;
+  font-size: 20px;
+  color: var(--primary-text-color);
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--primary-text-color);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.form-group input[type="checkbox"] {
+  width: auto;
+  margin-right: 8px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group select,
+.form-group textarea {
+  padding: 8px 12px;
+  border: 1px solid var(--divider-color);
+  border-radius: 4px;
+  background: var(--card-background-color);
+  color: var(--primary-text-color);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.form-group textarea {
+  resize: vertical;
+}
+
+.dialog-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.dialog-buttons .action-button {
+  margin-top: 0;
+}
+
+/* Inline action buttons */
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.action-buttons-inline {
+  display: flex;
+  gap: 4px;
+}
+
+.small-button {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  background: var(--secondary-background-color);
+  color: var(--primary-text-color);
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+
+.small-button:hover {
+  background: var(--primary-color);
+  color: var(--text-primary-color);
+}

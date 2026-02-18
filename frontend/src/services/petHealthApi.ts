@@ -1,7 +1,7 @@
-import type { 
-  HomeAssistant, 
-  PetEntry, 
-  Visit, 
+import type {
+  HomeAssistant,
+  PetEntry,
+  Visit,
   StoreData,
   MedicationLog,
   LogBathroomVisitData,
@@ -10,44 +10,84 @@ import type {
 } from '../types';
 
 export class PetHealthAPI {
+  private petDataCache: PetEntry[] = [];
+
   constructor(private hass: HomeAssistant) {}
+
+  private async ensurePetDataCache(): Promise<void> {
+    if (this.petDataCache.length === 0) {
+      this.petDataCache = await this.getPetData();
+    }
+  }
+
+  private getPetIdFromEntryId(entryId: string): string | undefined {
+    const pet = this.petDataCache.find(p => p.entry_id === entryId);
+    return pet?.pet_id;
+  }
 
   async getPetData(): Promise<PetEntry[]> {
     const result = await this.hass.callWS<{ entries: PetEntry[] }>({
       type: 'pet_health/get_pet_data',
     });
-    return result?.entries || [];
+    this.petDataCache = result?.entries || [];
+    return this.petDataCache;
   }
 
   async getStoreDump(entryId?: string): Promise<StoreData> {
-    const result = await this.hass.callWS<StoreData>({
+    await this.ensurePetDataCache();
+    const petId = entryId ? this.getPetIdFromEntryId(entryId) : undefined;
+
+    const result = await this.hass.callWS<{ data: Record<string, StoreData> }>({
       type: 'pet_health/get_store_dump',
-      entry_id: entryId,
+      pet_id: petId,
     });
-    return result || {};
+
+    // If specific pet requested, return just that pet's data
+    if (petId && result?.data?.[petId]) {
+      return result.data[petId];
+    }
+
+    // Otherwise return all data
+    return result?.data || {};
   }
 
   async getVisits(entryId: string): Promise<Visit[]> {
-    const result = await this.hass.callWS<Visit[]>({
+    await this.ensurePetDataCache();
+    const petId = this.getPetIdFromEntryId(entryId);
+
+    if (!petId) {
+      console.warn('No pet_id found for entry_id:', entryId);
+      return [];
+    }
+
+    const result = await this.hass.callWS<{ visits: Visit[] }>({
       type: 'pet_health/get_visits',
-      entry_id: entryId,
+      pet_id: petId,
     });
-    return result || [];
+    return result?.visits || [];
   }
 
   async getUnknownVisits(): Promise<Visit[]> {
-    const result = await this.hass.callWS<Visit[]>({
+    const result = await this.hass.callWS<{ visits: Visit[] }>({
       type: 'pet_health/get_unknown_visits',
     });
-    return result || [];
+    return result?.visits || [];
   }
 
   async getMedications(entryId: string): Promise<MedicationLog[]> {
-    const result = await this.hass.callWS<MedicationLog[]>({
+    await this.ensurePetDataCache();
+    const petId = this.getPetIdFromEntryId(entryId);
+
+    if (!petId) {
+      console.warn('No pet_id found for entry_id:', entryId);
+      return [];
+    }
+
+    const result = await this.hass.callWS<{ medications: MedicationLog[] }>({
       type: 'pet_health/get_medications',
-      entry_id: entryId,
+      pet_id: petId,
     });
-    return result || [];
+    return result?.medications || [];
   }
 
   async logBathroomVisit(data: LogBathroomVisitData): Promise<void> {
