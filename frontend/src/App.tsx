@@ -410,6 +410,7 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '11px',
     fontWeight: 700,
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+    zIndex: 10,
   },
   badgeContainer: {
     position: 'relative' as const,
@@ -574,7 +575,12 @@ function App({ hass }: AppProps) {
 
   const getPetImageUrl = (pet: PetEntry) => {
     if (pet.pet_image_path) {
-      return pet.pet_image_path;
+      const path = pet.pet_image_path.trim();
+      // If it's a relative path (doesn't start with / or http), prepend /local/
+      if (path && !path.startsWith('/') && !path.startsWith('http')) {
+        return `/local/${path}`;
+      }
+      return path;
     }
     const petType = pet.pet_type || 'other';
     return `/pet_health_panel/default-${petType}.svg`;
