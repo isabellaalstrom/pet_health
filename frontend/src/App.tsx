@@ -410,7 +410,6 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '11px',
     fontWeight: 700,
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-    zIndex: 10,
   },
   badgeContainer: {
     position: 'relative' as const,
@@ -444,11 +443,12 @@ function App({ hass }: AppProps) {
   const [logFormData, setLogFormData] = useState({
     did_pee: false,
     did_poop: false,
-    consistency: '',
+    consistencies: [] as string[],
     color: '',
     urine_amount: '',
     notes: '',
     timestamp: '',
+    assigned_to: '',
   });
   const [medFormData, setMedFormData] = useState({
     medication_id: '',
@@ -575,12 +575,7 @@ function App({ hass }: AppProps) {
 
   const getPetImageUrl = (pet: PetEntry) => {
     if (pet.pet_image_path) {
-      const path = pet.pet_image_path.trim();
-      // If it's a relative path (doesn't start with / or http), prepend /local/
-      if (path && !path.startsWith('/') && !path.startsWith('http')) {
-        return `/local/${path}`;
-      }
-      return path;
+      return pet.pet_image_path;
     }
     const petType = pet.pet_type || 'other';
     return `/pet_health_panel/default-${petType}.svg`;
@@ -605,11 +600,12 @@ function App({ hass }: AppProps) {
     setLogFormData({
       did_pee: false,
       did_poop: false,
-      consistency: '',
+      consistencies: [],
       color: '',
       urine_amount: '',
       notes: '',
       timestamp: '',
+      assigned_to: '',
     });
     setShowLogDialog(true);
   };
@@ -622,15 +618,26 @@ function App({ hass }: AppProps) {
         config_entry_id: selectedPetId,
         did_pee: logFormData.did_pee,
         did_poop: logFormData.did_poop,
-        poop_consistencies: logFormData.consistency ? [logFormData.consistency] : undefined,
-        poop_color: logFormData.color || undefined,
-        urine_amount: logFormData.urine_amount ? Number(logFormData.urine_amount) : undefined,
-        notes: logFormData.notes || undefined,
         confirmed: true,
       };
+
+      // Only add fields if they have values
+      if (logFormData.consistencies.length > 0) {
+        serviceData.poop_consistencies = logFormData.consistencies;
+      }
+      if (logFormData.color) {
+        serviceData.poop_color = logFormData.color;
+      }
+      if (logFormData.urine_amount) {
+        serviceData.urine_amount = logFormData.urine_amount;
+      }
+      if (logFormData.notes) {
+        serviceData.notes = logFormData.notes;
+      }
       if (logFormData.timestamp) {
         serviceData.logged_at = new Date(logFormData.timestamp).toISOString();
       }
+
       await api.logBathroomVisit(serviceData);
       setShowLogDialog(false);
       reloadVisits();
@@ -670,11 +677,14 @@ function App({ hass }: AppProps) {
     setLogFormData({
       did_pee: visit.did_pee || false,
       did_poop: visit.did_poop || false,
-      consistency: visit.poop_consistencies || '',
+      consistencies: Array.isArray(visit.poop_consistencies)
+        ? visit.poop_consistencies
+        : (visit.poop_consistencies ? [visit.poop_consistencies] : []),
       color: visit.poop_color || '',
       urine_amount: visit.urine_amount?.toString() || '',
       notes: visit.notes || '',
       timestamp: '',
+      assigned_to: selectedPetId || '',
     });
     setShowAmendDialog(true);
   };
@@ -683,14 +693,32 @@ function App({ hass }: AppProps) {
     if (!api || !selectedPetId || !editingVisit) return;
 
     try {
-      await api.amendVisit(editingVisit.visit_id, {
+      const amendData: any = {
         did_pee: logFormData.did_pee,
         did_poop: logFormData.did_poop,
-        poop_consistencies: logFormData.consistency ? [logFormData.consistency] : undefined,
-        poop_color: logFormData.color || undefined,
-        urine_amount: logFormData.urine_amount ? Number(logFormData.urine_amount) : undefined,
-        notes: logFormData.notes || undefined,
-      });
+      };
+
+      // Only add fields if they have values
+      if (logFormData.consistencies.length > 0) {
+        amendData.poop_consistencies = logFormData.consistencies;
+      }
+      if (logFormData.color) {
+        amendData.poop_color = logFormData.color;
+      }
+      if (logFormData.urine_amount) {
+        amendData.urine_amount = logFormData.urine_amount;
+      }
+      if (logFormData.notes) {
+        amendData.notes = logFormData.notes;
+      }
+
+      await api.amendVisit(editingVisit.visit_id, amendData);
+
+      // Handle reassignment if pet was changed
+      if (logFormData.assigned_to && logFormData.assigned_to !== selectedPetId) {
+        await api.reassignVisit(editingVisit.visit_id, logFormData.assigned_to);
+      }
+
       setShowAmendDialog(false);
       setEditingVisit(null);
       reloadVisits();
@@ -1304,23 +1332,73 @@ function App({ hass }: AppProps) {
               <>
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
-                    Consistency:
-                    <select
-                      value={logFormData.consistency}
-                      onChange={(e) => setLogFormData({...logFormData, consistency: e.target.value})}
-                    >
-                      <option value="">Select...</option>
-                      <option value="hard">Hard</option>
-                      <option value="normal">Normal</option>
-                      <option value="soft">Soft</option>
-                      <option value="diarrhea">Diarrhea</option>
-                    </select>
+                    Consistency (click to add in order):
+                    <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px'}}>
+                      {['constipated', 'hard', 'normal', 'soft', 'diarrhea'].map(consistency => (
+                        <button
+                          key={consistency}
+                          type="button"
+                          onClick={() => setLogFormData({...logFormData, consistencies: [...logFormData.consistencies, consistency]})}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '14px',
+                            backgroundColor: '#03a9f4',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {consistency.charAt(0).toUpperCase() + consistency.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                    {logFormData.consistencies.length > 0 && (
+                      <div style={{marginTop: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px'}}>
+                        <div style={{fontSize: '12px', color: '#666', marginBottom: '4px'}}>Sequence:</div>
+                        <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
+                          {logFormData.consistencies.map((c, idx) => (
+                            <div
+                              key={idx}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                backgroundColor: 'white',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px',
+                                fontSize: '13px'
+                              }}
+                            >
+                              <span>{c.charAt(0).toUpperCase() + c.slice(1)}</span>
+                              <button
+                                type="button"
+                                onClick={() => setLogFormData({...logFormData, consistencies: logFormData.consistencies.filter((_, i) => i !== idx)})}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#f44336',
+                                  cursor: 'pointer',
+                                  fontSize: '16px',
+                                  lineHeight: '1',
+                                  padding: '0 2px'
+                                }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </label>
                 </div>
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
                     Color:
                     <select
+                      style={styles.select}
                       value={logFormData.color}
                       onChange={(e) => setLogFormData({...logFormData, color: e.target.value})}
                     >
@@ -1340,14 +1418,17 @@ function App({ hass }: AppProps) {
             {logFormData.did_pee && (
               <div style={styles.formGroup}>
                 <label style={styles.label}>
-                  Urine Amount (1-5):
-                  <input
-                    type="number"
-                    min="1"
-                    max="5"
+                  Urine Amount:
+                  <select
+                    style={styles.select}
                     value={logFormData.urine_amount}
                     onChange={(e) => setLogFormData({...logFormData, urine_amount: e.target.value})}
-                  />
+                  >
+                    <option value="">Select...</option>
+                    <option value="normal">Normal</option>
+                    <option value="more_than_usual">More than usual</option>
+                    <option value="less_than_usual">Less than usual</option>
+                  </select>
                 </label>
               </div>
             )}
@@ -1408,23 +1489,73 @@ function App({ hass }: AppProps) {
               <>
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
-                    Consistency:
-                    <select
-                      value={logFormData.consistency}
-                      onChange={(e) => setLogFormData({...logFormData, consistency: e.target.value})}
-                    >
-                      <option value="">Select...</option>
-                      <option value="hard">Hard</option>
-                      <option value="normal">Normal</option>
-                      <option value="soft">Soft</option>
-                      <option value="diarrhea">Diarrhea</option>
-                    </select>
+                    Consistency (click to add in order):
+                    <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px'}}>
+                      {['constipated', 'hard', 'normal', 'soft', 'diarrhea'].map(consistency => (
+                        <button
+                          key={consistency}
+                          type="button"
+                          onClick={() => setLogFormData({...logFormData, consistencies: [...logFormData.consistencies, consistency]})}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '14px',
+                            backgroundColor: '#03a9f4',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {consistency.charAt(0).toUpperCase() + consistency.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                    {logFormData.consistencies.length > 0 && (
+                      <div style={{marginTop: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px'}}>
+                        <div style={{fontSize: '12px', color: '#666', marginBottom: '4px'}}>Sequence:</div>
+                        <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
+                          {logFormData.consistencies.map((c, idx) => (
+                            <div
+                              key={idx}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                backgroundColor: 'white',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px',
+                                fontSize: '13px'
+                              }}
+                            >
+                              <span>{c.charAt(0).toUpperCase() + c.slice(1)}</span>
+                              <button
+                                type="button"
+                                onClick={() => setLogFormData({...logFormData, consistencies: logFormData.consistencies.filter((_, i) => i !== idx)})}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#f44336',
+                                  cursor: 'pointer',
+                                  fontSize: '16px',
+                                  lineHeight: '1',
+                                  padding: '0 2px'
+                                }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </label>
                 </div>
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
                     Color:
                     <select
+                      style={styles.select}
                       value={logFormData.color}
                       onChange={(e) => setLogFormData({...logFormData, color: e.target.value})}
                     >
@@ -1444,14 +1575,17 @@ function App({ hass }: AppProps) {
             {logFormData.did_pee && (
               <div style={styles.formGroup}>
                 <label style={styles.label}>
-                  Urine Amount (1-5):
-                  <input
-                    type="number"
-                    min="1"
-                    max="5"
+                  Urine Amount:
+                  <select
+                    style={styles.select}
                     value={logFormData.urine_amount}
                     onChange={(e) => setLogFormData({...logFormData, urine_amount: e.target.value})}
-                  />
+                  >
+                    <option value="">Select...</option>
+                    <option value="normal">Normal</option>
+                    <option value="more_than_usual">More than usual</option>
+                    <option value="less_than_usual">Less than usual</option>
+                  </select>
                 </label>
               </div>
             )}
@@ -1463,6 +1597,22 @@ function App({ hass }: AppProps) {
                   onChange={(e) => setLogFormData({...logFormData, notes: e.target.value})}
                   rows={3}
                 />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Reassign to:
+                <select
+                  style={styles.select}
+                  value={logFormData.assigned_to}
+                  onChange={(e) => setLogFormData({...logFormData, assigned_to: e.target.value})}
+                >
+                  {pets.map(pet => (
+                    <option key={pet.entry_id} value={pet.entry_id}>
+                      {getPetName(pet)}{pet.entry_id === selectedPetId ? ' (current)' : ''}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
             <div style={styles.dialogButtons}>
