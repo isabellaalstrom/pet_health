@@ -46,25 +46,25 @@ Error generating stack: `+i.message+`
       padding: 12px !important;
       gap: 8px !important;
     }
-    
+
     .mobile-table-row > td {
       display: flex !important;
       justify-content: space-between !important;
       padding: 4px 0 !important;
       border: none !important;
     }
-    
+
     .mobile-table-row > td::before {
       content: attr(data-label);
       font-weight: 600;
       color: #666;
       margin-right: 12px;
     }
-    
+
     .mobile-hide-header thead {
       display: none !important;
     }
-    
+
     .mobile-compact {
       padding: 8px 12px !important;
       font-size: 13px !important;
