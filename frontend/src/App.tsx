@@ -1,13 +1,280 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, CSSProperties } from 'react';
 import { usePets } from './hooks/usePets';
 import { useVisits } from './hooks/useVisits';
 import { PetHealthAPI } from './services/petHealthApi';
 import type { View, PetEntry, HomeAssistant, Visit, MedicationLog, StoreData, Medication } from './types';
-import './App.css';
 
 interface AppProps {
   hass: HomeAssistant;
 }
+
+const styles: Record<string, CSSProperties> = {
+  container: {
+    maxWidth: '1400px',
+    margin: '0 auto',
+    padding: '20px',
+    minHeight: '100vh',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  },
+  header: {
+    background: '#ffffff',
+    borderRadius: '12px',
+    padding: '32px',
+    marginBottom: '24px',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+  },
+  h1: {
+    margin: '0 0 24px 0',
+    fontSize: '32px',
+    fontWeight: 700,
+    color: '#212121',
+  },
+  petSelector: {
+    display: 'flex',
+    gap: '16px',
+    flexWrap: 'wrap' as const,
+    margin: '16px 0',
+    justifyContent: 'center',
+  },
+  petButton: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: '10px',
+    padding: '16px 20px',
+    border: '3px solid #e0e0e0',
+    borderRadius: '12px',
+    background: '#ffffff',
+    color: '#212121',
+    cursor: 'pointer',
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    minWidth: '110px',
+  },
+  petButtonSelected: {
+    border: '3px solid #03a9f4',
+    background: '#03a9f4',
+    color: '#ffffff',
+    boxShadow: '0 4px 12px rgba(3, 169, 244, 0.3)',
+    transform: 'translateY(-2px)',
+  },
+  petImage: {
+    width: '72px',
+    height: '72px',
+    borderRadius: '50%',
+    objectFit: 'cover' as const,
+    border: '3px solid #e0e0e0',
+  },
+  petImageSelected: {
+    borderColor: '#ffffff',
+    boxShadow: '0 0 0 3px rgba(255, 255, 255, 0.2)',
+  },
+  petName: {
+    fontSize: '14px',
+    fontWeight: 600,
+    textAlign: 'center' as const,
+  },
+  navigation: {
+    display: 'flex',
+    gap: '12px',
+    flexWrap: 'wrap' as const,
+    marginBottom: '24px',
+    background: '#ffffff',
+    padding: '12px',
+    borderRadius: '12px',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+  },
+  navButton: {
+    padding: '14px 28px',
+    border: 'none',
+    borderRadius: '8px',
+    background: 'transparent',
+    color: '#212121',
+    cursor: 'pointer',
+    fontSize: '15px',
+    fontWeight: 500,
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+  },
+  navButtonActive: {
+    background: '#03a9f4',
+    color: '#ffffff',
+    boxShadow: '0 2px 8px rgba(3, 169, 244, 0.3)',
+  },
+  card: {
+    background: '#ffffff',
+    borderRadius: '12px',
+    padding: '28px',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+    marginBottom: '24px',
+  },
+  h2: {
+    margin: '0 0 24px 0',
+    fontSize: '22px',
+    fontWeight: 700,
+    color: '#212121',
+    paddingBottom: '12px',
+    borderBottom: '2px solid #e0e0e0',
+  },
+  h3: {
+    margin: '24px 0 16px 0',
+    fontSize: '18px',
+    fontWeight: 600,
+    color: '#212121',
+  },
+  stats: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '20px',
+    margin: '24px 0',
+  },
+  statCard: {
+    background: 'linear-gradient(135deg, #e5e5e5 0%, #ffffff 100%)',
+    padding: '24px',
+    borderRadius: '12px',
+    textAlign: 'center' as const,
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    border: '2px solid transparent',
+  },
+  statLabel: {
+    fontSize: '13px',
+    color: '#727272',
+    marginBottom: '12px',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '1px',
+    fontWeight: 600,
+  },
+  statValue: {
+    fontSize: '40px',
+    fontWeight: 800,
+    color: '#03a9f4',
+    lineHeight: 1,
+  },
+  actionButtons: {
+    display: 'flex',
+    gap: '16px',
+    flexWrap: 'wrap' as const,
+    marginTop: '16px',
+  },
+  actionButton: {
+    padding: '14px 32px',
+    border: 'none',
+    borderRadius: '8px',
+    background: '#03a9f4',
+    color: '#ffffff',
+    cursor: 'pointer',
+    fontSize: '15px',
+    fontWeight: 600,
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    boxShadow: '0 2px 8px rgba(3, 169, 244, 0.2)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'separate' as const,
+    borderSpacing: 0,
+    marginTop: '24px',
+  },
+  th: {
+    padding: '16px',
+    textAlign: 'left' as const,
+    background: '#e5e5e5',
+    fontWeight: 700,
+    color: '#212121',
+    fontSize: '13px',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    borderBottom: '1px solid #e0e0e0',
+  },
+  td: {
+    padding: '16px',
+    textAlign: 'left' as const,
+    color: '#727272',
+    fontSize: '14px',
+    borderBottom: '1px solid #e0e0e0',
+  },
+  smallButton: {
+    padding: '6px 10px',
+    border: 'none',
+    borderRadius: '6px',
+    background: '#e5e5e5',
+    color: '#212121',
+    cursor: 'pointer',
+    fontSize: '16px',
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    minWidth: '32px',
+    marginRight: '6px',
+  },
+  dialogOverlay: {
+    position: 'fixed' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0, 0, 0, 0.6)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  dialog: {
+    background: '#ffffff',
+    borderRadius: '12px',
+    padding: '32px',
+    maxWidth: '550px',
+    width: '90%',
+    maxHeight: '85vh',
+    overflowY: 'auto' as const,
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+  },
+  formGroup: {
+    marginBottom: '20px',
+  },
+  label: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '10px',
+    color: '#212121',
+    fontSize: '14px',
+    fontWeight: 600,
+  },
+  input: {
+    padding: '12px 16px',
+    border: '2px solid #e0e0e0',
+    borderRadius: '8px',
+    background: '#ffffff',
+    color: '#212121',
+    fontSize: '15px',
+    fontFamily: 'inherit',
+  },
+  textarea: {
+    padding: '12px 16px',
+    border: '2px solid #e0e0e0',
+    borderRadius: '8px',
+    background: '#ffffff',
+    color: '#212121',
+    fontSize: '15px',
+    fontFamily: 'inherit',
+    resize: 'vertical' as const,
+    minHeight: '80px',
+  },
+  select: {
+    padding: '12px 16px',
+    border: '2px solid #e0e0e0',
+    borderRadius: '8px',
+    background: '#ffffff',
+    color: '#212121',
+    fontSize: '15px',
+    fontFamily: 'inherit',
+  },
+  dialogButtons: {
+    display: 'flex',
+    gap: '16px',
+    justifyContent: 'flex-end' as const,
+    marginTop: '32px',
+    paddingTop: '24px',
+    borderTop: '1px solid #e0e0e0',
+  },
+};
 
 function App({ hass }: AppProps) {
   const api = useMemo(() => new PetHealthAPI(hass), [hass]);
@@ -292,59 +559,59 @@ function App({ hass }: AppProps) {
   };
 
   return (
-    <div className="pet-health-container">
-      <div className="header">
-        <h1>🐾 Pet Health</h1>
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <h1 style={styles.h1}>🐾 Pet Health</h1>
 
-        <div className="pet-selector">
+        <div style={styles.petSelector}>
           {pets.map(pet => (
             <button
               key={pet.entry_id}
-              className={`pet-button ${pet.entry_id === selectedPetId ? 'selected' : ''}`}
+              style={pet.entry_id === selectedPetId ? {...styles.petButton, ...styles.petButtonSelected} : styles.petButton}
               onClick={() => setSelectedPetId(pet.entry_id)}
             >
               <img
                 src={getPetImageUrl(pet)}
                 alt={getPetName(pet)}
-                className="pet-button-image"
+                style={pet.entry_id === selectedPetId ? {...styles.petImage, ...styles.petImageSelected} : styles.petImage}
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.src = '/pet_health_panel/default-other.svg';
                 }}
               />
-              <span className="pet-button-name">{getPetName(pet)}</span>
+              <span style={styles.petName}>{getPetName(pet)}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="navigation">
+      <div style={styles.navigation}>
         <button
-          className={`nav-button ${currentView === 'dashboard' ? 'active' : ''}`}
+          style={currentView === 'dashboard' ? {...styles.navButton, ...styles.navButtonActive} : styles.navButton}
           onClick={() => setCurrentView('dashboard')}
         >
           Dashboard
         </button>
         <button
-          className={`nav-button ${currentView === 'visits' ? 'active' : ''}`}
+          style={currentView === 'visits' ? {...styles.navButton, ...styles.navButtonActive} : styles.navButton}
           onClick={() => setCurrentView('visits')}
         >
           Bathroom Visits
         </button>
         <button
-          className={`nav-button ${currentView === 'medications' ? 'active' : ''}`}
+          style={currentView === 'medications' ? {...styles.navButton, ...styles.navButtonActive} : styles.navButton}
           onClick={() => setCurrentView('medications')}
         >
           Medications
         </button>
         <button
-          className={`nav-button ${currentView === 'health' ? 'active' : ''}`}
+          style={currentView === 'health' ? {...styles.navButton, ...styles.navButtonActive} : styles.navButton}
           onClick={() => setCurrentView('health')}
         >
           Health
         </button>
         <button
-          className={`nav-button ${currentView === 'nutrition' ? 'active' : ''}`}
+          style={currentView === 'nutrition' ? {...styles.navButton, ...styles.navButtonActive} : styles.navButton}
           onClick={() => setCurrentView('nutrition')}
         >
           Nutrition
@@ -352,17 +619,17 @@ function App({ hass }: AppProps) {
       </div>
 
       {currentView === 'dashboard' && selectedPet && (
-        <div className="content">
-          <div className="card">
-            <h2>Dashboard for {getPetName(selectedPet)}</h2>
-            <div className="stats">
-              <div className="stat-card">
-                <div className="stat-label">Total Visits</div>
-                <div className="stat-value">{visits.length}</div>
+        <div style={{display: "flex", flexDirection: "column", gap: "24px"}}>
+          <div style={styles.card}>
+            <h2 style={styles.h2}>Dashboard for {getPetName(selectedPet)}</h2>
+            <div style={styles.stats}>
+              <div style={styles.statCard}>
+                <div style={styles.statLabel}>Total Visits</div>
+                <div style={styles.statValue}>{visits.length}</div>
               </div>
-              <div className="stat-card">
-                <div className="stat-label">Today's Visits</div>
-                <div className="stat-value">
+              <div style={styles.statCard}>
+                <div style={styles.statLabel}>Today's Visits</div>
+                <div style={styles.statValue}>
                   {visits.filter(v => {
                     const visitDate = new Date(v.timestamp);
                     const today = new Date();
@@ -371,17 +638,17 @@ function App({ hass }: AppProps) {
                 </div>
               </div>
               {unknownVisits.length > 0 && (
-                <div className="stat-card">
-                  <div className="stat-label">Unknown Visits</div>
-                  <div className="stat-value">{unknownVisits.length}</div>
+                <div style={styles.statCard}>
+                  <div style={styles.statLabel}>Unknown Visits</div>
+                  <div style={styles.statValue}>{unknownVisits.length}</div>
                 </div>
               )}
             </div>
-            <div className="action-buttons">
-              <button className="action-button" onClick={handleLogVisit}>
+            <div style={styles.actionButtons}>
+              <button style={styles.actionButton} onClick={handleLogVisit}>
                 Log Bathroom Visit
               </button>
-              <button className="action-button" onClick={handleLogMedication}>
+              <button style={styles.actionButton} onClick={handleLogMedication}>
                 Log Medication
               </button>
             </div>
@@ -390,47 +657,47 @@ function App({ hass }: AppProps) {
       )}
 
       {currentView === 'visits' && selectedPet && (
-        <div className="content">
-          <div className="card">
-            <h2>Bathroom Visits for {getPetName(selectedPet)}</h2>
-            <button className="action-button" onClick={handleLogVisit}>
+        <div style={{display: "flex", flexDirection: "column", gap: "24px"}}>
+          <div style={styles.card}>
+            <h2 style={styles.h2}>Bathroom Visits for {getPetName(selectedPet)}</h2>
+            <button style={styles.actionButton} onClick={handleLogVisit}>
               Log New Visit
             </button>
 
             {visits.length === 0 ? (
               <p>No visits recorded yet.</p>
             ) : (
-              <div className="visits-table">
-                <table>
+              <div style={{marginTop: "24px", overflowX: "auto"}}>
+                <table style={styles.table}>
                   <thead>
                     <tr>
-                      <th>Time</th>
-                      <th>Pee</th>
-                      <th>Poop</th>
-                      <th>Consistency</th>
-                      <th>Color</th>
-                      <th>Urine Amount</th>
-                      <th>Notes</th>
-                      <th>Confirmed</th>
-                      <th>Actions</th>
+                      <th style={styles.th}>Time</th>
+                      <th style={styles.th}>Pee</th>
+                      <th style={styles.th}>Poop</th>
+                      <th style={styles.th}>Consistency</th>
+                      <th style={styles.th}>Color</th>
+                      <th style={styles.th}>Urine Amount</th>
+                      <th style={styles.th}>Notes</th>
+                      <th style={styles.th}>Confirmed</th>
+                      <th style={styles.th}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {visits.slice(0, 50).map(visit => (
                       <tr key={visit.visit_id}>
-                        <td>{formatTimestamp(visit.timestamp)}</td>
-                        <td>{visit.did_pee ? '✓' : ''}</td>
-                        <td>{visit.did_poop ? '✓' : ''}</td>
-                        <td>{visit.poop_consistencies || ''}</td>
-                        <td>{visit.poop_color || ''}</td>
-                        <td>{visit.urine_amount || ''}</td>
-                        <td>{visit.notes || ''}</td>
-                        <td>{visit.confirmed ? '✓' : '?'}</td>
-                        <td>
-                          <div className="action-buttons-inline">
+                        <td style={styles.td}>{formatTimestamp(visit.timestamp)}</td>
+                        <td style={styles.td}>{visit.did_pee ? '✓' : ''}</td>
+                        <td style={styles.td}>{visit.did_poop ? '✓' : ''}</td>
+                        <td style={styles.td}>{visit.poop_consistencies || ''}</td>
+                        <td style={styles.td}>{visit.poop_color || ''}</td>
+                        <td style={styles.td}>{visit.urine_amount || ''}</td>
+                        <td style={styles.td}>{visit.notes || ''}</td>
+                        <td style={styles.td}>{visit.confirmed ? '✓' : '?'}</td>
+                        <td style={styles.td}>
+                          <div style={{display: "flex", gap: "6px"}}>
                             {!visit.confirmed && (
                               <button
-                                className="small-button"
+                                style={styles.smallButton}
                                 onClick={() => handleConfirmVisit(visit.visit_id)}
                                 title="Confirm"
                               >
@@ -438,14 +705,14 @@ function App({ hass }: AppProps) {
                               </button>
                             )}
                             <button
-                              className="small-button"
+                              style={styles.smallButton}
                               onClick={() => handleAmendVisit(visit)}
                               title="Amend"
                             >
                               ✏️
                             </button>
                             <button
-                              className="small-button"
+                              style={styles.smallButton}
                               onClick={() => handleDeleteVisit(visit.visit_id)}
                               title="Delete"
                             >
@@ -462,26 +729,26 @@ function App({ hass }: AppProps) {
 
             {unknownVisits.length > 0 && (
               <>
-                <h3>Unknown Visits (Need Assignment)</h3>
-                <div className="visits-table">
-                  <table>
+                <h3 style={styles.h3}>Unknown Visits (Need Assignment)</h3>
+                <div style={{marginTop: "24px", overflowX: "auto"}}>
+                  <table style={styles.table}>
                     <thead>
                       <tr>
-                        <th>Time</th>
-                        <th>Pee</th>
-                        <th>Poop</th>
-                        <th>Notes</th>
-                        <th>Assign To</th>
+                        <th style={styles.th}>Time</th>
+                        <th style={styles.th}>Pee</th>
+                        <th style={styles.th}>Poop</th>
+                        <th style={styles.th}>Notes</th>
+                        <th style={styles.th}>Assign To</th>
                       </tr>
                     </thead>
                     <tbody>
                       {unknownVisits.map(visit => (
                         <tr key={visit.visit_id}>
-                          <td>{formatTimestamp(visit.timestamp)}</td>
-                          <td>{visit.did_pee ? '✓' : ''}</td>
-                          <td>{visit.did_poop ? '✓' : ''}</td>
-                          <td>{visit.notes || ''}</td>
-                          <td>
+                          <td style={styles.td}>{formatTimestamp(visit.timestamp)}</td>
+                          <td style={styles.td}>{visit.did_pee ? '✓' : ''}</td>
+                          <td style={styles.td}>{visit.did_poop ? '✓' : ''}</td>
+                          <td style={styles.td}>{visit.notes || ''}</td>
+                          <td style={styles.td}>
                             <select
                               onChange={(e) => {
                                 if (e.target.value) {
@@ -510,35 +777,35 @@ function App({ hass }: AppProps) {
       )}
 
       {currentView === 'medications' && selectedPet && (
-        <div className="content">
-          <div className="card">
-            <h2>Medications for {getPetName(selectedPet)}</h2>
-            <button className="action-button" onClick={handleLogMedication}>
+        <div style={{display: "flex", flexDirection: "column", gap: "24px"}}>
+          <div style={styles.card}>
+            <h2 style={styles.h2}>Medications for {getPetName(selectedPet)}</h2>
+            <button style={styles.actionButton} onClick={handleLogMedication}>
               Log Medication
             </button>
 
             {medications.length === 0 ? (
               <p>No medications logged yet.</p>
             ) : (
-              <div className="visits-table">
-                <table>
+              <div style={{marginTop: "24px", overflowX: "auto"}}>
+                <table style={styles.table}>
                   <thead>
                     <tr>
-                      <th>Time</th>
-                      <th>Medication</th>
-                      <th>Dosage</th>
-                      <th>Unit</th>
-                      <th>Notes</th>
+                      <th style={styles.th}>Time</th>
+                      <th style={styles.th}>Medication</th>
+                      <th style={styles.th}>Dosage</th>
+                      <th style={styles.th}>Unit</th>
+                      <th style={styles.th}>Notes</th>
                     </tr>
                   </thead>
                   <tbody>
                     {medications.slice(0, 50).map((med, idx) => (
                       <tr key={`${med.medication_name}-${med.timestamp}-${idx}`}>
-                        <td>{formatTimestamp(med.timestamp)}</td>
-                        <td>{med.medication_name}</td>
-                        <td>{med.dosage || ''}</td>
-                        <td>{med.unit || ''}</td>
-                        <td>{med.notes || ''}</td>
+                        <td style={styles.td}>{formatTimestamp(med.timestamp)}</td>
+                        <td style={styles.td}>{med.medication_name}</td>
+                        <td style={styles.td}>{med.dosage || ''}</td>
+                        <td style={styles.td}>{med.unit || ''}</td>
+                        <td style={styles.td}>{med.notes || ''}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -550,12 +817,12 @@ function App({ hass }: AppProps) {
       )}
 
       {currentView === 'health' && selectedPet && (
-        <div className="content">
-          <div className="card">
-            <h2>Health Tracking for {getPetName(selectedPet)}</h2>
+        <div style={{display: "flex", flexDirection: "column", gap: "24px"}}>
+          <div style={styles.card}>
+            <h2 style={styles.h2}>Health Tracking for {getPetName(selectedPet)}</h2>
             {storeData.weights && storeData.weights.length > 0 ? (
               <div>
-                <h3>Weight History</h3>
+                <h3 style={styles.h3}>Weight History</h3>
                 <pre>{JSON.stringify(storeData.weights, null, 2)}</pre>
               </div>
             ) : (
@@ -563,13 +830,13 @@ function App({ hass }: AppProps) {
             )}
             {storeData.vomits && storeData.vomits.length > 0 && (
               <div>
-                <h3>Vomit Records</h3>
+                <h3 style={styles.h3}>Vomit Records</h3>
                 <pre>{JSON.stringify(storeData.vomits, null, 2)}</pre>
               </div>
             )}
             {storeData.assessments && storeData.assessments.length > 0 && (
               <div>
-                <h3>Health Assessments</h3>
+                <h3 style={styles.h3}>Health Assessments</h3>
                 <pre>{JSON.stringify(storeData.assessments, null, 2)}</pre>
               </div>
             )}
@@ -578,12 +845,12 @@ function App({ hass }: AppProps) {
       )}
 
       {currentView === 'nutrition' && selectedPet && (
-        <div className="content">
-          <div className="card">
-            <h2>Nutrition for {getPetName(selectedPet)}</h2>
+        <div style={{display: "flex", flexDirection: "column", gap: "24px"}}>
+          <div style={styles.card}>
+            <h2 style={styles.h2}>Nutrition for {getPetName(selectedPet)}</h2>
             {storeData.meals && storeData.meals.length > 0 ? (
               <div>
-                <h3>Meals</h3>
+                <h3 style={styles.h3}>Meals</h3>
                 <pre>{JSON.stringify(storeData.meals, null, 2)}</pre>
               </div>
             ) : (
@@ -591,7 +858,7 @@ function App({ hass }: AppProps) {
             )}
             {storeData.drinks && storeData.drinks.length > 0 && (
               <div>
-                <h3>Drinks</h3>
+                <h3 style={styles.h3}>Drinks</h3>
                 <pre>{JSON.stringify(storeData.drinks, null, 2)}</pre>
               </div>
             )}
@@ -601,11 +868,11 @@ function App({ hass }: AppProps) {
 
       {/* Log Visit Dialog */}
       {showLogDialog && (
-        <div className="dialog-overlay" onClick={() => setShowLogDialog(false)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()}>
-            <h2>Log Bathroom Visit</h2>
-            <div className="form-group">
-              <label>
+        <div style={styles.dialogOverlay} onClick={() => setShowLogDialog(false)}>
+          <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.h2}>Log Bathroom Visit</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
                 <input
                   type="checkbox"
                   checked={logFormData.did_pee}
@@ -614,8 +881,8 @@ function App({ hass }: AppProps) {
                 Did Pee
               </label>
             </div>
-            <div className="form-group">
-              <label>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
                 <input
                   type="checkbox"
                   checked={logFormData.did_poop}
@@ -626,8 +893,8 @@ function App({ hass }: AppProps) {
             </div>
             {logFormData.did_poop && (
               <>
-                <div className="form-group">
-                  <label>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>
                     Consistency:
                     <select
                       value={logFormData.consistency}
@@ -641,8 +908,8 @@ function App({ hass }: AppProps) {
                     </select>
                   </label>
                 </div>
-                <div className="form-group">
-                  <label>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>
                     Color:
                     <select
                       value={logFormData.color}
@@ -662,8 +929,8 @@ function App({ hass }: AppProps) {
               </>
             )}
             {logFormData.did_pee && (
-              <div className="form-group">
-                <label>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
                   Urine Amount (1-5):
                   <input
                     type="number"
@@ -675,8 +942,8 @@ function App({ hass }: AppProps) {
                 </label>
               </div>
             )}
-            <div className="form-group">
-              <label>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
                 Notes:
                 <textarea
                   value={logFormData.notes}
@@ -685,9 +952,9 @@ function App({ hass }: AppProps) {
                 />
               </label>
             </div>
-            <div className="dialog-buttons">
-              <button className="action-button" onClick={submitLogVisit}>Submit</button>
-              <button className="action-button" onClick={() => setShowLogDialog(false)}>Cancel</button>
+            <div style={styles.dialogButtons}>
+              <button style={styles.actionButton} onClick={submitLogVisit}>Submit</button>
+              <button style={styles.actionButton} onClick={() => setShowLogDialog(false)}>Cancel</button>
             </div>
           </div>
         </div>
@@ -695,11 +962,11 @@ function App({ hass }: AppProps) {
 
       {/* Amend Visit Dialog */}
       {showAmendDialog && editingVisit && (
-        <div className="dialog-overlay" onClick={() => setShowAmendDialog(false)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()}>
-            <h2>Amend Visit</h2>
-            <div className="form-group">
-              <label>
+        <div style={styles.dialogOverlay} onClick={() => setShowAmendDialog(false)}>
+          <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.h2}>Amend Visit</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
                 <input
                   type="checkbox"
                   checked={logFormData.did_pee}
@@ -708,8 +975,8 @@ function App({ hass }: AppProps) {
                 Did Pee
               </label>
             </div>
-            <div className="form-group">
-              <label>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
                 <input
                   type="checkbox"
                   checked={logFormData.did_poop}
@@ -720,8 +987,8 @@ function App({ hass }: AppProps) {
             </div>
             {logFormData.did_poop && (
               <>
-                <div className="form-group">
-                  <label>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>
                     Consistency:
                     <select
                       value={logFormData.consistency}
@@ -735,8 +1002,8 @@ function App({ hass }: AppProps) {
                     </select>
                   </label>
                 </div>
-                <div className="form-group">
-                  <label>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>
                     Color:
                     <select
                       value={logFormData.color}
@@ -756,8 +1023,8 @@ function App({ hass }: AppProps) {
               </>
             )}
             {logFormData.did_pee && (
-              <div className="form-group">
-                <label>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
                   Urine Amount (1-5):
                   <input
                     type="number"
@@ -769,8 +1036,8 @@ function App({ hass }: AppProps) {
                 </label>
               </div>
             )}
-            <div className="form-group">
-              <label>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
                 Notes:
                 <textarea
                   value={logFormData.notes}
@@ -779,9 +1046,9 @@ function App({ hass }: AppProps) {
                 />
               </label>
             </div>
-            <div className="dialog-buttons">
-              <button className="action-button" onClick={submitAmendVisit}>Submit</button>
-              <button className="action-button" onClick={() => setShowAmendDialog(false)}>Cancel</button>
+            <div style={styles.dialogButtons}>
+              <button style={styles.actionButton} onClick={submitAmendVisit}>Submit</button>
+              <button style={styles.actionButton} onClick={() => setShowAmendDialog(false)}>Cancel</button>
             </div>
           </div>
         </div>
@@ -789,11 +1056,11 @@ function App({ hass }: AppProps) {
 
       {/* Log Medication Dialog */}
       {showMedDialog && (
-        <div className="dialog-overlay" onClick={() => setShowMedDialog(false)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()}>
-            <h2>Log Medication</h2>
-            <div className="form-group">
-              <label>
+        <div style={styles.dialogOverlay} onClick={() => setShowMedDialog(false)}>
+          <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.h2}>Log Medication</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
                 Medication:
                 <select
                   value={medFormData.medication_id}
@@ -808,8 +1075,8 @@ function App({ hass }: AppProps) {
                 </select>
               </label>
             </div>
-            <div className="form-group">
-              <label>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
                 Dosage:
                 <input
                   type="text"
@@ -818,8 +1085,8 @@ function App({ hass }: AppProps) {
                 />
               </label>
             </div>
-            <div className="form-group">
-              <label>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
                 Unit:
                 <input
                   type="text"
@@ -828,8 +1095,8 @@ function App({ hass }: AppProps) {
                 />
               </label>
             </div>
-            <div className="form-group">
-              <label>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
                 Notes:
                 <textarea
                   value={medFormData.notes}
@@ -838,9 +1105,9 @@ function App({ hass }: AppProps) {
                 />
               </label>
             </div>
-            <div className="dialog-buttons">
-              <button className="action-button" onClick={submitLogMedication}>Submit</button>
-              <button className="action-button" onClick={() => setShowMedDialog(false)}>Cancel</button>
+            <div style={styles.dialogButtons}>
+              <button style={styles.actionButton} onClick={submitLogMedication}>Submit</button>
+              <button style={styles.actionButton} onClick={() => setShowMedDialog(false)}>Cancel</button>
             </div>
           </div>
         </div>

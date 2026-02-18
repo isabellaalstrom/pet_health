@@ -12,6 +12,8 @@ class PetHealthPanel extends HTMLElement {
     // Create a mount point for React directly in the element (no Shadow DOM)
     const mountPoint = document.createElement('div');
     mountPoint.id = 'react-root';
+    mountPoint.style.minHeight = '100vh';
+    mountPoint.style.width = '100%';
     this.appendChild(mountPoint);
 
     // Initialize React root and render once
