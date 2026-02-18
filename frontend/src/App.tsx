@@ -274,6 +274,31 @@ const styles: Record<string, CSSProperties> = {
     paddingTop: '24px',
     borderTop: '1px solid #e0e0e0',
   },
+  badge: {
+    position: 'absolute' as const,
+    top: '-6px',
+    right: '-6px',
+    background: '#f44336',
+    color: '#ffffff',
+    borderRadius: '50%',
+    width: '22px',
+    height: '22px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '11px',
+    fontWeight: 700,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+  },
+  badgeContainer: {
+    position: 'relative' as const,
+    display: 'inline-block',
+  },
+  unconfirmedMark: {
+    color: '#f44336',
+    fontSize: '20px',
+    fontWeight: 700,
+  },
 };
 
 function App({ hass }: AppProps) {
@@ -397,6 +422,19 @@ function App({ hass }: AppProps) {
   const getPetName = (pet: PetEntry) => {
     return pet.pet_name || pet.name || pet.title || 'Unknown Pet';
   };
+
+  // Calculate unconfirmed visits for each pet
+  const getUnconfirmedCount = (petEntryId: string) => {
+    const pet = pets.find(p => p.entry_id === petEntryId);
+    if (!pet || !pet.pet_id) return 0;
+    return visits.filter(v => v.pet_id === pet.pet_id && !v.confirmed).length;
+  };
+
+  const hasAlerts = (petEntryId: string) => {
+    return getUnconfirmedCount(petEntryId) > 0;
+  };
+
+  const totalUnconfirmedVisits = visits.filter(v => !v.confirmed).length;
 
   const getPetImageUrl = (pet: PetEntry) => {
     if (pet.pet_image_path) {
@@ -578,22 +616,26 @@ function App({ hass }: AppProps) {
 
         <div style={styles.petSelector}>
           {pets.map(pet => (
-            <button
-              key={pet.entry_id}
-              style={pet.entry_id === selectedPetId ? {...styles.petButton, ...styles.petButtonSelected} : styles.petButton}
-              onClick={() => setSelectedPetId(pet.entry_id)}
-            >
-              <img
-                src={getPetImageUrl(pet)}
-                alt={getPetName(pet)}
-                style={pet.entry_id === selectedPetId ? {...styles.petImage, ...styles.petImageSelected} : styles.petImage}
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = '/pet_health_panel/default-other.svg';
-                }}
-              />
-              <span style={styles.petName}>{getPetName(pet)}</span>
-            </button>
+            <div key={pet.entry_id} style={styles.badgeContainer}>
+              <button
+                style={pet.entry_id === selectedPetId ? {...styles.petButton, ...styles.petButtonSelected} : styles.petButton}
+                onClick={() => setSelectedPetId(pet.entry_id)}
+              >
+                <img
+                  src={getPetImageUrl(pet)}
+                  alt={getPetName(pet)}
+                  style={pet.entry_id === selectedPetId ? {...styles.petImage, ...styles.petImageSelected} : styles.petImage}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = '/pet_health_panel/default-other.svg';
+                  }}
+                />
+                <span style={styles.petName}>{getPetName(pet)}</span>
+              </button>
+              {hasAlerts(pet.entry_id) && (
+                <div style={styles.badge}>!</div>
+              )}
+            </div>
           ))}
         </div>
       </div>
@@ -605,12 +647,19 @@ function App({ hass }: AppProps) {
         >
           Dashboard
         </button>
-        <button
-          style={currentView === 'visits' ? {...styles.navButton, ...styles.navButtonActive} : styles.navButton}
-          onClick={() => setCurrentView('visits')}
-        >
-          Bathroom Visits
-        </button>
+        <div style={styles.badgeContainer}>
+          <button
+            style={currentView === 'visits' ? {...styles.navButton, ...styles.navButtonActive} : styles.navButton}
+            onClick={() => setCurrentView('visits')}
+          >
+            Bathroom Visits
+          </button>
+          {(totalUnconfirmedVisits > 0 || unknownVisits.length > 0) && (
+            <div style={styles.badge}>
+              {totalUnconfirmedVisits + unknownVisits.length}
+            </div>
+          )}
+        </div>
         <button
           style={currentView === 'medications' ? {...styles.navButton, ...styles.navButtonActive} : styles.navButton}
           onClick={() => setCurrentView('medications')}
@@ -671,8 +720,62 @@ function App({ hass }: AppProps) {
 
       {currentView === 'visits' && selectedPet && (
         <div style={{display: "flex", flexDirection: "column", gap: "24px"}}>
+          {unknownVisits.length > 0 && (
+            <div style={styles.card}>
+              <h2 style={styles.h2}>⚠️ Unknown Visits (Need Assignment)</h2>
+              <div style={{marginTop: "24px", overflowX: "auto"}}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Time</th>
+                      <th style={styles.th}>Pee</th>
+                      <th style={styles.th}>Poop</th>
+                      <th style={styles.th}>Notes</th>
+                      <th style={styles.th}>Assign To</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unknownVisits.map(visit => (
+                      <tr key={visit.visit_id} style={{background: '#fff3e0'}}>
+                        <td style={styles.td}>{formatTimestamp(visit.timestamp)}</td>
+                        <td style={styles.td}>{visit.did_pee ? '✓' : ''}</td>
+                        <td style={styles.td}>{visit.did_poop ? '✓' : ''}</td>
+                        <td style={styles.td}>{visit.notes || ''}</td>
+                        <td style={styles.td}>
+                          <select
+                            style={{padding: '8px', borderRadius: '6px', border: '2px solid #ff9800'}}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                handleReassignVisit(visit.visit_id, e.target.value);
+                              }
+                            }}
+                            defaultValue=""
+                          >
+                            <option value="">Select pet...</option>
+                            {pets.map(pet => (
+                              <option key={pet.entry_id} value={pet.entry_id}>
+                                {getPetName(pet)}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           <div style={styles.card}>
-            <h2 style={styles.h2}>Bathroom Visits for {getPetName(selectedPet)}</h2>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px'}}>
+              <h2 style={{...styles.h2, margin: 0, border: 'none', paddingBottom: 0}}>Bathroom Visits for {getPetName(selectedPet)}</h2>
+              {visits.filter(v => !v.confirmed).length > 0 && (
+                <div style={{color: '#f44336', fontWeight: 600, fontSize: '14px'}}>
+                  {visits.filter(v => !v.confirmed).length} unconfirmed
+                </div>
+              )}
+            </div>
             <button style={styles.actionButton} onClick={handleLogVisit}>
               Log New Visit
             </button>
@@ -697,7 +800,7 @@ function App({ hass }: AppProps) {
                   </thead>
                   <tbody>
                     {visits.slice(0, 50).map(visit => (
-                      <tr key={visit.visit_id}>
+                      <tr key={visit.visit_id} style={!visit.confirmed ? {background: '#ffebee'} : undefined}>
                         <td style={styles.td}>{formatTimestamp(visit.timestamp)}</td>
                         <td style={styles.td}>{visit.did_pee ? '✓' : ''}</td>
                         <td style={styles.td}>{visit.did_poop ? '✓' : ''}</td>
@@ -705,32 +808,54 @@ function App({ hass }: AppProps) {
                         <td style={styles.td}>{visit.poop_color || ''}</td>
                         <td style={styles.td}>{visit.urine_amount || ''}</td>
                         <td style={styles.td}>{visit.notes || ''}</td>
-                        <td style={styles.td}>{visit.confirmed ? '✓' : '?'}</td>
                         <td style={styles.td}>
-                          <div style={{display: "flex", gap: "6px"}}>
-                            {!visit.confirmed && (
+                          {visit.confirmed ? '✓' : <span style={styles.unconfirmedMark}>?</span>}
+                        </td>
+                        <td style={styles.td}>
+                          <div style={{display: "flex", flexDirection: "column", gap: "6px"}}>
+                            <div style={{display: "flex", gap: "6px"}}>
+                              {!visit.confirmed && (
+                                <button
+                                  style={styles.smallButton}
+                                  onClick={() => handleConfirmVisit(visit.visit_id)}
+                                  title="Confirm"
+                                >
+                                  ✓
+                                </button>
+                              )}
                               <button
                                 style={styles.smallButton}
-                                onClick={() => handleConfirmVisit(visit.visit_id)}
-                                title="Confirm"
+                                onClick={() => handleAmendVisit(visit)}
+                                title="Amend"
                               >
-                                ✓
+                                ✏️
                               </button>
+                              <button
+                                style={styles.smallButton}
+                                onClick={() => handleDeleteVisit(visit.visit_id)}
+                                title="Delete"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                            {!visit.confirmed && (
+                              <select
+                                style={{padding: '6px', borderRadius: '4px', border: '2px solid #f44336', fontSize: '12px'}}
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    handleReassignVisit(visit.visit_id, e.target.value);
+                                  }
+                                }}
+                                defaultValue=""
+                              >
+                                <option value="">Reassign...</option>
+                                {pets.filter(p => p.entry_id !== selectedPetId).map(pet => (
+                                  <option key={pet.entry_id} value={pet.entry_id}>
+                                    {getPetName(pet)}
+                                  </option>
+                                ))}
+                              </select>
                             )}
-                            <button
-                              style={styles.smallButton}
-                              onClick={() => handleAmendVisit(visit)}
-                              title="Amend"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              style={styles.smallButton}
-                              onClick={() => handleDeleteVisit(visit.visit_id)}
-                              title="Delete"
-                            >
-                              🗑️
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -738,52 +863,6 @@ function App({ hass }: AppProps) {
                   </tbody>
                 </table>
               </div>
-            )}
-
-            {unknownVisits.length > 0 && (
-              <>
-                <h3 style={styles.h3}>Unknown Visits (Need Assignment)</h3>
-                <div style={{marginTop: "24px", overflowX: "auto"}}>
-                  <table style={styles.table}>
-                    <thead>
-                      <tr>
-                        <th style={styles.th}>Time</th>
-                        <th style={styles.th}>Pee</th>
-                        <th style={styles.th}>Poop</th>
-                        <th style={styles.th}>Notes</th>
-                        <th style={styles.th}>Assign To</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {unknownVisits.map(visit => (
-                        <tr key={visit.visit_id}>
-                          <td style={styles.td}>{formatTimestamp(visit.timestamp)}</td>
-                          <td style={styles.td}>{visit.did_pee ? '✓' : ''}</td>
-                          <td style={styles.td}>{visit.did_poop ? '✓' : ''}</td>
-                          <td style={styles.td}>{visit.notes || ''}</td>
-                          <td style={styles.td}>
-                            <select
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  handleReassignVisit(visit.visit_id, e.target.value);
-                                }
-                              }}
-                              defaultValue=""
-                            >
-                              <option value="">Select pet...</option>
-                              {pets.map(pet => (
-                                <option key={pet.entry_id} value={pet.entry_id}>
-                                  {getPetName(pet)}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
             )}
           </div>
         </div>
