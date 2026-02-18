@@ -410,6 +410,7 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '11px',
     fontWeight: 700,
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+    zIndex: 10,
   },
   badgeContainer: {
     position: 'relative' as const,
@@ -421,6 +422,93 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
   },
 };
+
+// Reusable consistency selector component
+interface ConsistencySelectorProps {
+  consistencies: string[];
+  onChange: (consistencies: string[]) => void;
+}
+
+function ConsistencySelector({ consistencies, onChange }: ConsistencySelectorProps) {
+  const consistencyOptions = ['constipated', 'hard', 'normal', 'soft', 'diarrhea'];
+
+  const addConsistency = (consistency: string) => {
+    onChange([...consistencies, consistency]);
+  };
+
+  const removeConsistency = (index: number) => {
+    onChange(consistencies.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div style={styles.formGroup}>
+      <label style={styles.label}>
+        Consistency (click to add in order):
+        <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px'}}>
+          {consistencyOptions.map(consistency => (
+            <button
+              key={consistency}
+              type="button"
+              onClick={() => addConsistency(consistency)}
+              style={{
+                padding: '6px 12px',
+                fontSize: '14px',
+                backgroundColor: '#03a9f4',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              {consistency.charAt(0).toUpperCase() + consistency.slice(1)}
+            </button>
+          ))}
+        </div>
+        {consistencies.length > 0 && (
+          <div style={{marginTop: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px'}}>
+            <div style={{fontSize: '12px', color: '#666', marginBottom: '4px'}}>Sequence:</div>
+            <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
+              {consistencies.map((c, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 8px',
+                    backgroundColor: 'white',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '13px'
+                  }}
+                >
+                  <span>{c.charAt(0).toUpperCase() + c.slice(1)}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeConsistency(idx)}
+                    aria-label={`Remove ${c} consistency`}
+                    title={`Remove ${c} consistency`}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#f44336',
+                      cursor: 'pointer',
+                      fontSize: '16px',
+                      lineHeight: '1',
+                      padding: '0 2px'
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </label>
+    </div>
+  );
+}
 
 function App({ hass }: AppProps) {
   const api = useMemo(() => new PetHealthAPI(hass), [hass]);
@@ -626,14 +714,16 @@ function App({ hass }: AppProps) {
         confirmed: true,
       };
 
-      // Only add fields if they have values
-      if (logFormData.consistencies.length > 0) {
-        serviceData.poop_consistencies = logFormData.consistencies;
+      // Only add fields if they have values and the corresponding toggle is enabled
+      if (logFormData.did_poop) {
+        if (logFormData.consistencies.length > 0) {
+          serviceData.poop_consistencies = logFormData.consistencies;
+        }
+        if (logFormData.color) {
+          serviceData.poop_color = logFormData.color;
+        }
       }
-      if (logFormData.color) {
-        serviceData.poop_color = logFormData.color;
-      }
-      if (logFormData.urine_amount) {
+      if (logFormData.did_pee && logFormData.urine_amount) {
         serviceData.urine_amount = logFormData.urine_amount;
       }
       if (logFormData.notes) {
@@ -703,14 +793,17 @@ function App({ hass }: AppProps) {
         did_poop: logFormData.did_poop,
       };
 
-      // Only add fields if they have values
-      if (logFormData.consistencies.length > 0) {
-        amendData.poop_consistencies = logFormData.consistencies;
+      // Only add detail fields when the corresponding event occurred
+      if (logFormData.did_poop) {
+        if (logFormData.consistencies.length > 0) {
+          amendData.poop_consistencies = logFormData.consistencies;
+        }
+        if (logFormData.color) {
+          amendData.poop_color = logFormData.color;
+        }
       }
-      if (logFormData.color) {
-        amendData.poop_color = logFormData.color;
-      }
-      if (logFormData.urine_amount) {
+
+      if (logFormData.did_pee && logFormData.urine_amount) {
         amendData.urine_amount = logFormData.urine_amount;
       }
       if (logFormData.notes) {
@@ -1335,70 +1428,10 @@ function App({ hass }: AppProps) {
             </div>
             {logFormData.did_poop && (
               <>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    Consistency (click to add in order):
-                    <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px'}}>
-                      {['constipated', 'hard', 'normal', 'soft', 'diarrhea'].map(consistency => (
-                        <button
-                          key={consistency}
-                          type="button"
-                          onClick={() => setLogFormData({...logFormData, consistencies: [...logFormData.consistencies, consistency]})}
-                          style={{
-                            padding: '6px 12px',
-                            fontSize: '14px',
-                            backgroundColor: '#03a9f4',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {consistency.charAt(0).toUpperCase() + consistency.slice(1)}
-                        </button>
-                      ))}
-                    </div>
-                    {logFormData.consistencies.length > 0 && (
-                      <div style={{marginTop: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px'}}>
-                        <div style={{fontSize: '12px', color: '#666', marginBottom: '4px'}}>Sequence:</div>
-                        <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
-                          {logFormData.consistencies.map((c, idx) => (
-                            <div
-                              key={idx}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '4px 8px',
-                                backgroundColor: 'white',
-                                border: '1px solid #ddd',
-                                borderRadius: '4px',
-                                fontSize: '13px'
-                              }}
-                            >
-                              <span>{c.charAt(0).toUpperCase() + c.slice(1)}</span>
-                              <button
-                                type="button"
-                                onClick={() => setLogFormData({...logFormData, consistencies: logFormData.consistencies.filter((_, i) => i !== idx)})}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  color: '#f44336',
-                                  cursor: 'pointer',
-                                  fontSize: '16px',
-                                  lineHeight: '1',
-                                  padding: '0 2px'
-                                }}
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </label>
-                </div>
+                <ConsistencySelector
+                  consistencies={logFormData.consistencies}
+                  onChange={(consistencies) => setLogFormData({...logFormData, consistencies})}
+                />
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
                     Color:
@@ -1492,70 +1525,10 @@ function App({ hass }: AppProps) {
             </div>
             {logFormData.did_poop && (
               <>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    Consistency (click to add in order):
-                    <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px'}}>
-                      {['constipated', 'hard', 'normal', 'soft', 'diarrhea'].map(consistency => (
-                        <button
-                          key={consistency}
-                          type="button"
-                          onClick={() => setLogFormData({...logFormData, consistencies: [...logFormData.consistencies, consistency]})}
-                          style={{
-                            padding: '6px 12px',
-                            fontSize: '14px',
-                            backgroundColor: '#03a9f4',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {consistency.charAt(0).toUpperCase() + consistency.slice(1)}
-                        </button>
-                      ))}
-                    </div>
-                    {logFormData.consistencies.length > 0 && (
-                      <div style={{marginTop: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px'}}>
-                        <div style={{fontSize: '12px', color: '#666', marginBottom: '4px'}}>Sequence:</div>
-                        <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
-                          {logFormData.consistencies.map((c, idx) => (
-                            <div
-                              key={idx}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '4px 8px',
-                                backgroundColor: 'white',
-                                border: '1px solid #ddd',
-                                borderRadius: '4px',
-                                fontSize: '13px'
-                              }}
-                            >
-                              <span>{c.charAt(0).toUpperCase() + c.slice(1)}</span>
-                              <button
-                                type="button"
-                                onClick={() => setLogFormData({...logFormData, consistencies: logFormData.consistencies.filter((_, i) => i !== idx)})}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  color: '#f44336',
-                                  cursor: 'pointer',
-                                  fontSize: '16px',
-                                  lineHeight: '1',
-                                  padding: '0 2px'
-                                }}
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </label>
-                </div>
+                <ConsistencySelector
+                  consistencies={logFormData.consistencies}
+                  onChange={(consistencies) => setLogFormData({...logFormData, consistencies})}
+                />
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
                     Color:
