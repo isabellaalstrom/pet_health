@@ -9,10 +9,10 @@ export function usePets(api: PetHealthAPI | null) {
 
   const loadPets = useCallback(async () => {
     if (!api) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const data = await api.getPetData();
       setPets(data);

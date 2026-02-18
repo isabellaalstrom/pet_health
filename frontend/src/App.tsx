@@ -298,12 +298,14 @@ function App({ hass }: AppProps) {
     color: '',
     urine_amount: '',
     notes: '',
+    timestamp: '',
   });
   const [medFormData, setMedFormData] = useState({
     medication_id: '',
     dosage: '',
     unit: '',
     notes: '',
+    timestamp: '',
   });
 
   // Auto-select first pet
@@ -409,13 +411,13 @@ function App({ hass }: AppProps) {
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
 
-    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', hour12: false });
 
     if (isToday) {
       return timeStr;
     }
 
-    const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    const dateStr = date.toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' });
     return `${dateStr} ${timeStr}`;
   };
 
@@ -427,6 +429,7 @@ function App({ hass }: AppProps) {
       color: '',
       urine_amount: '',
       notes: '',
+      timestamp: '',
     });
     setShowLogDialog(true);
   };
@@ -435,16 +438,20 @@ function App({ hass }: AppProps) {
     if (!api || !selectedPetId) return;
 
     try {
-      await api.logBathroomVisit({
+      const serviceData: any = {
         config_entry_id: selectedPetId,
         did_pee: logFormData.did_pee,
         did_poop: logFormData.did_poop,
-        consistency: logFormData.consistency || undefined,
-        color: logFormData.color || undefined,
+        poop_consistencies: logFormData.consistency ? [logFormData.consistency] : undefined,
+        poop_color: logFormData.color || undefined,
         urine_amount: logFormData.urine_amount ? Number(logFormData.urine_amount) : undefined,
         notes: logFormData.notes || undefined,
         confirmed: true,
-      });
+      };
+      if (logFormData.timestamp) {
+        serviceData.logged_at = new Date(logFormData.timestamp).toISOString();
+      }
+      await api.logBathroomVisit(serviceData);
       setShowLogDialog(false);
       reloadVisits();
     } catch (err) {
@@ -457,7 +464,7 @@ function App({ hass }: AppProps) {
     if (!api || !selectedPetId) return;
 
     try {
-      await api.confirmVisit(visitId, selectedPetId);
+      await api.confirmVisit(visitId);
       reloadVisits();
     } catch (err) {
       console.error('Failed to confirm visit:', err);
@@ -470,7 +477,7 @@ function App({ hass }: AppProps) {
     if (!confirm('Are you sure you want to delete this visit?')) return;
 
     try {
-      await api.deleteVisit(visitId, selectedPetId);
+      await api.deleteVisit(visitId);
       reloadVisits();
     } catch (err) {
       console.error('Failed to delete visit:', err);
@@ -487,6 +494,7 @@ function App({ hass }: AppProps) {
       color: visit.poop_color || '',
       urine_amount: visit.urine_amount?.toString() || '',
       notes: visit.notes || '',
+      timestamp: '',
     });
     setShowAmendDialog(true);
   };
@@ -495,11 +503,11 @@ function App({ hass }: AppProps) {
     if (!api || !selectedPetId || !editingVisit) return;
 
     try {
-      await api.amendVisit(editingVisit.visit_id, selectedPetId, {
+      await api.amendVisit(editingVisit.visit_id, {
         did_pee: logFormData.did_pee,
         did_poop: logFormData.did_poop,
-        consistency: logFormData.consistency || undefined,
-        color: logFormData.color || undefined,
+        poop_consistencies: logFormData.consistency ? [logFormData.consistency] : undefined,
+        poop_color: logFormData.color || undefined,
         urine_amount: logFormData.urine_amount ? Number(logFormData.urine_amount) : undefined,
         notes: logFormData.notes || undefined,
       });
@@ -530,6 +538,7 @@ function App({ hass }: AppProps) {
       dosage: '',
       unit: '',
       notes: '',
+      timestamp: '',
     });
     setShowMedDialog(true);
   };
@@ -541,13 +550,17 @@ function App({ hass }: AppProps) {
     }
 
     try {
-      await api.logMedication({
+      const serviceData: any = {
         config_entry_id: selectedPetId,
         medication_id: medFormData.medication_id,
         dosage: medFormData.dosage || undefined,
         unit: medFormData.unit || undefined,
         notes: medFormData.notes || undefined,
-      });
+      };
+      if (medFormData.timestamp) {
+        serviceData.given_at = new Date(medFormData.timestamp).toISOString();
+      }
+      await api.logMedication(serviceData);
       setShowMedDialog(false);
       if (selectedPetId) {
         api.getMedications(selectedPetId).then(setMedications).catch(console.error);
@@ -818,51 +831,202 @@ function App({ hass }: AppProps) {
 
       {currentView === 'health' && selectedPet && (
         <div style={{display: "flex", flexDirection: "column", gap: "24px"}}>
-          <div style={styles.card}>
-            <h2 style={styles.h2}>Health Tracking for {getPetName(selectedPet)}</h2>
-            {storeData.weights && storeData.weights.length > 0 ? (
-              <div>
-                <h3 style={styles.h3}>Weight History</h3>
-                <pre>{JSON.stringify(storeData.weights, null, 2)}</pre>
-              </div>
-            ) : (
+          {/* Wellbeing */}
+          {storeData.wellbeing && storeData.wellbeing.length > 0 && (
+            <div style={styles.card}>
+              <h3 style={styles.h3}>Wellbeing Assessments</h3>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Time</th>
+                    <th style={styles.th}>Score</th>
+                    <th style={styles.th}>Symptoms</th>
+                    <th style={styles.th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeData.wellbeing.map((record: any, idx: number) => (
+                    <tr key={idx} style={idx % 2 === 0 ? styles.tr : {...styles.tr, background: '#f9fafb'}}>
+                      <td style={styles.td}>{formatTimestamp(record.timestamp)}</td>
+                      <td style={styles.td}>{record.wellbeing_score}</td>
+                      <td style={styles.td}>{record.symptoms?.join(', ') || '-'}</td>
+                      <td style={styles.td}>{record.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Thirst Levels */}
+          {storeData.thirst_levels && storeData.thirst_levels.length > 0 && (
+            <div style={styles.card}>
+              <h3 style={styles.h3}>Thirst Levels</h3>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Time</th>
+                    <th style={styles.th}>Level</th>
+                    <th style={styles.th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeData.thirst_levels.map((record: any, idx: number) => (
+                    <tr key={idx} style={idx % 2 === 0 ? styles.tr : {...styles.tr, background: '#f9fafb'}}>
+                      <td style={styles.td}>{formatTimestamp(record.timestamp)}</td>
+                      <td style={styles.td}>{record.level}</td>
+                      <td style={styles.td}>{record.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Appetite Levels */}
+          {storeData.appetite_levels && storeData.appetite_levels.length > 0 && (
+            <div style={styles.card}>
+              <h3 style={styles.h3}>Appetite Levels</h3>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Time</th>
+                    <th style={styles.th}>Level</th>
+                    <th style={styles.th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeData.appetite_levels.map((record: any, idx: number) => (
+                    <tr key={idx} style={idx % 2 === 0 ? styles.tr : {...styles.tr, background: '#f9fafb'}}>
+                      <td style={styles.td}>{formatTimestamp(record.timestamp)}</td>
+                      <td style={styles.td}>{record.level}</td>
+                      <td style={styles.td}>{record.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Weight History */}
+          {storeData.weight && storeData.weight.length > 0 && (
+            <div style={styles.card}>
+              <h3 style={styles.h3}>Weight History</h3>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Time</th>
+                    <th style={styles.th}>Weight</th>
+                    <th style={styles.th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeData.weight.map((record: any, idx: number) => (
+                    <tr key={idx} style={idx % 2 === 0 ? styles.tr : {...styles.tr, background: '#f9fafb'}}>
+                      <td style={styles.td}>{formatTimestamp(record.timestamp)}</td>
+                      <td style={styles.td}>{(record.weight_grams / 1000).toFixed(2)} kg</td>
+                      <td style={styles.td}>{record.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Vomit Records */}
+          {storeData.vomit && storeData.vomit.length > 0 && (
+            <div style={styles.card}>
+              <h3 style={styles.h3}>Vomit Records</h3>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Time</th>
+                    <th style={styles.th}>Type</th>
+                    <th style={styles.th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeData.vomit.map((record: any, idx: number) => (
+                    <tr key={idx} style={idx % 2 === 0 ? styles.tr : {...styles.tr, background: '#f9fafb'}}>
+                      <td style={styles.td}>{formatTimestamp(record.timestamp)}</td>
+                      <td style={styles.td}>{record.vomit_type}</td>
+                      <td style={styles.td}>{record.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {!storeData.wellbeing?.length && !storeData.thirst_levels?.length &&
+           !storeData.appetite_levels?.length && !storeData.weight?.length &&
+           !storeData.vomit?.length && (
+            <div style={styles.card}>
               <p>No health data recorded yet.</p>
-            )}
-            {storeData.vomits && storeData.vomits.length > 0 && (
-              <div>
-                <h3 style={styles.h3}>Vomit Records</h3>
-                <pre>{JSON.stringify(storeData.vomits, null, 2)}</pre>
-              </div>
-            )}
-            {storeData.assessments && storeData.assessments.length > 0 && (
-              <div>
-                <h3 style={styles.h3}>Health Assessments</h3>
-                <pre>{JSON.stringify(storeData.assessments, null, 2)}</pre>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
       {currentView === 'nutrition' && selectedPet && (
         <div style={{display: "flex", flexDirection: "column", gap: "24px"}}>
-          <div style={styles.card}>
-            <h2 style={styles.h2}>Nutrition for {getPetName(selectedPet)}</h2>
-            {storeData.meals && storeData.meals.length > 0 ? (
-              <div>
-                <h3 style={styles.h3}>Meals</h3>
-                <pre>{JSON.stringify(storeData.meals, null, 2)}</pre>
-              </div>
-            ) : (
-              <p>No meal data recorded yet.</p>
-            )}
-            {storeData.drinks && storeData.drinks.length > 0 && (
-              <div>
-                <h3 style={styles.h3}>Drinks</h3>
-                <pre>{JSON.stringify(storeData.drinks, null, 2)}</pre>
-              </div>
-            )}
-          </div>
+          {/* Meals */}
+          {storeData.meals && storeData.meals.length > 0 && (
+            <div style={styles.card}>
+              <h3 style={styles.h3}>Meals</h3>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Time</th>
+                    <th style={styles.th}>Amount</th>
+                    <th style={styles.th}>Food Type</th>
+                    <th style={styles.th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeData.meals.map((record: any, idx: number) => (
+                    <tr key={idx} style={idx % 2 === 0 ? styles.tr : {...styles.tr, background: '#f9fafb'}}>
+                      <td style={styles.td}>{formatTimestamp(record.timestamp)}</td>
+                      <td style={styles.td}>{record.amount}</td>
+                      <td style={styles.td}>{record.food_type || '-'}</td>
+                      <td style={styles.td}>{record.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Drinks */}
+          {storeData.drinks && storeData.drinks.length > 0 && (
+            <div style={styles.card}>
+              <h3 style={styles.h3}>Drinks</h3>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Time</th>
+                    <th style={styles.th}>Amount</th>
+                    <th style={styles.th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeData.drinks.map((record: any, idx: number) => (
+                    <tr key={idx} style={idx % 2 === 0 ? styles.tr : {...styles.tr, background: '#f9fafb'}}>
+                      <td style={styles.td}>{formatTimestamp(record.timestamp)}</td>
+                      <td style={styles.td}>{record.amount}</td>
+                      <td style={styles.td}>{record.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {!storeData.meals?.length && !storeData.drinks?.length && (
+            <div style={styles.card}>
+              <p>No nutrition data recorded yet.</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -949,6 +1113,16 @@ function App({ hass }: AppProps) {
                   value={logFormData.notes}
                   onChange={(e) => setLogFormData({...logFormData, notes: e.target.value})}
                   rows={3}
+                />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Time (leave empty for now):
+                <input
+                  type="datetime-local"
+                  value={logFormData.timestamp}
+                  onChange={(e) => setLogFormData({...logFormData, timestamp: e.target.value})}
                 />
               </label>
             </div>
@@ -1102,6 +1276,16 @@ function App({ hass }: AppProps) {
                   value={medFormData.notes}
                   onChange={(e) => setMedFormData({...medFormData, notes: e.target.value})}
                   rows={3}
+                />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Time (leave empty for now):
+                <input
+                  type="datetime-local"
+                  value={medFormData.timestamp}
+                  onChange={(e) => setMedFormData({...medFormData, timestamp: e.target.value})}
                 />
               </label>
             </div>

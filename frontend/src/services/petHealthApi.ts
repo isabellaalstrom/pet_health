@@ -98,24 +98,21 @@ export class PetHealthAPI {
     await this.hass.callService('pet_health', 'log_medication', data);
   }
 
-  async confirmVisit(visitId: string, entryId: string): Promise<void> {
+  async confirmVisit(visitId: string): Promise<void> {
     await this.hass.callService('pet_health', 'confirm_visit', {
       visit_id: visitId,
-      config_entry_id: entryId,
     });
   }
 
-  async deleteVisit(visitId: string, entryId: string): Promise<void> {
+  async deleteVisit(visitId: string): Promise<void> {
     await this.hass.callService('pet_health', 'delete_visit', {
       visit_id: visitId,
-      config_entry_id: entryId,
     });
   }
 
-  async amendVisit(visitId: string, entryId: string, data: AmendVisitData): Promise<void> {
+  async amendVisit(visitId: string, data: AmendVisitData): Promise<void> {
     await this.hass.callService('pet_health', 'amend_visit', {
       visit_id: visitId,
-      config_entry_id: entryId,
       ...data,
     });
   }
@@ -123,7 +120,7 @@ export class PetHealthAPI {
   async reassignVisit(visitId: string, newEntryId: string): Promise<void> {
     await this.hass.callService('pet_health', 'reassign_visit', {
       visit_id: visitId,
-      new_config_entry_id: newEntryId,
+      config_entry_id: newEntryId,
     });
   }
 

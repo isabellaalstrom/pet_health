@@ -107,29 +107,19 @@ async def handle_get_pet_data(
         if entry_id and entry.entry_id != entry_id:
             continue
 
-        # Include medications for this pet (if any)
+        # Include configured medications for this pet from config entry options
+        # Check both options and data for backward compatibility
         pet_medications = []
-        entry_pet_id = entry.data.get("pet_id")
-        if entry_pet_id:
-            meds = store.get_medications(entry_pet_id)
-            pet_medications = [
+        configured_meds = entry.options.get("medications", []) or entry.data.get("medications", [])
+        for med in configured_meds:
+            pet_medications.append(
                 {
-                    "timestamp": m.timestamp.isoformat(),
-                    "pet_id": m.pet_id,
-                    "medication_name": m.medication_name,
-                    "dosage": m.dosage,
-                    "unit": m.unit,
-                    "notes": m.notes,
+                    "medication_id": med.get("medication_id"),
+                    "medication_name": med.get("medication_name"),
+                    "dosage": med.get("dosage", ""),
+                    "unit": med.get("unit", ""),
                 }
-                for m in meds
-            ]
-
-        _LOGGER.debug(
-            "pet_health.get_pet_data: entry=%s pet_id=%s meds_found=%d",
-            entry.entry_id,
-            entry_pet_id,
-            len(pet_medications),
-        )
+            )
 
         # Include fields at both root and in data object for backward compatibility
         # Frontend accesses entry.data.pet_image_path, while some code may use root-level fields
@@ -319,7 +309,7 @@ async def handle_get_unknown_visits(
 ) -> None:
     """Handle get unknown visits command."""
     from .const import UNKNOWN_ENTRY_ID
-    
+
     store: PetHealthStore = hass.data[DOMAIN]["store"]
 
     _LOGGER.debug("pet_health.get_unknown_visits called")
