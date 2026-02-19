@@ -457,6 +457,13 @@ function App({ hass }: AppProps) {
     notes: '',
     timestamp: '',
   });
+  const [showGenericLogDialog, setShowGenericLogDialog] = useState(false);
+  const [genericLogFormData, setGenericLogFormData] = useState({
+    category: '',
+    notes: '',
+    timestamp: '',
+  });
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   // Auto-select first pet
   useEffect(() => {
@@ -876,6 +883,14 @@ function App({ hass }: AppProps) {
           onClick={() => setCurrentView('nutrition')}
         >
           Nutrition
+        </button>
+        <button
+          style={currentView === 'logs'
+            ? {...s('navButton'), ...styles.navButtonActive}
+            : s('navButton')}
+          onClick={() => setCurrentView('logs')}
+        >
+          Logs
         </button>
       </div>
 
@@ -1308,6 +1323,77 @@ function App({ hass }: AppProps) {
         </div>
       )}
 
+      {currentView === 'logs' && selectedPet && (
+        <div style={{display: "flex", flexDirection: "column", gap: "24px"}}>
+          <div style={styles.card}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+              <h2 style={styles.h2}>Generic Logs</h2>
+              <button 
+                style={styles.button}
+                onClick={() => {
+                  setGenericLogFormData({category: '', notes: '', timestamp: ''});
+                  setShowGenericLogDialog(true);
+                }}
+              >
+                + Add Log
+              </button>
+            </div>
+
+            {/* Category Filter */}
+            {selectedPet.generic_log_categories && selectedPet.generic_log_categories.length > 0 && (
+              <div style={{marginBottom: '16px'}}>
+                <label style={styles.label}>Filter by category:</label>
+                <select 
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  style={{...styles.input, marginTop: '8px'}}
+                >
+                  <option value="all">All Categories</option>
+                  {selectedPet.generic_log_categories.map((cat: any) => (
+                    <option key={cat.category_id} value={cat.category_name}>
+                      {cat.category_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Generic Logs Table */}
+            {storeData.generic_logs && storeData.generic_logs.length > 0 ? (
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Time</th>
+                    <th style={styles.th}>Category</th>
+                    <th style={styles.th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeData.generic_logs
+                    .filter((log: any) => selectedCategory === 'all' || log.category === selectedCategory)
+                    .map((log: any, idx: number) => (
+                      <tr key={log.log_id || idx} style={idx % 2 === 0 ? styles.tr : {...styles.tr, background: '#f9fafb'}}>
+                        <td style={styles.td}>{formatTimestamp(log.timestamp)}</td>
+                        <td style={styles.td}>{log.category}</td>
+                        <td style={styles.td}>{log.notes}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>No logs recorded yet. Click "Add Log" to create one.</p>
+            )}
+
+            {selectedPet.generic_log_categories && selectedPet.generic_log_categories.length === 0 && (
+              <div style={{marginTop: '16px', padding: '12px', background: '#fff3cd', borderRadius: '8px', color: '#856404'}}>
+                <strong>Note:</strong> No log categories configured yet. 
+                Go to Settings → Devices & Services → Pet Health → Configure (your pet) → Manage log categories to add categories.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Log Visit Dialog */}
       {showLogDialog && (
         <div style={styles.dialogOverlay} onClick={() => setShowLogDialog(false)}>
@@ -1692,6 +1778,80 @@ function App({ hass }: AppProps) {
             <div style={styles.dialogButtons}>
               <button style={styles.actionButton} onClick={submitLogMedication}>Submit</button>
               <button style={styles.actionButton} onClick={() => setShowMedDialog(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generic Log Dialog */}
+      {showGenericLogDialog && (
+        <div style={styles.dialogOverlay} onClick={() => setShowGenericLogDialog(false)}>
+          <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.h2}>Add Generic Log</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Category:
+                <select
+                  value={genericLogFormData.category}
+                  onChange={(e) => setGenericLogFormData({...genericLogFormData, category: e.target.value})}
+                  style={styles.input}
+                >
+                  <option value="">Select category...</option>
+                  {selectedPet?.generic_log_categories?.map((cat: any) => (
+                    <option key={cat.category_id} value={cat.category_name}>
+                      {cat.category_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Notes:
+                <textarea
+                  value={genericLogFormData.notes}
+                  onChange={(e) => setGenericLogFormData({...genericLogFormData, notes: e.target.value})}
+                  rows={4}
+                  style={styles.input}
+                  placeholder="Enter details about this log entry..."
+                />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Time (leave empty for now):
+                <input
+                  type="datetime-local"
+                  value={genericLogFormData.timestamp}
+                  onChange={(e) => setGenericLogFormData({...genericLogFormData, timestamp: e.target.value})}
+                  style={styles.input}
+                />
+              </label>
+            </div>
+            <div style={styles.dialogButtons}>
+              <button style={styles.actionButton} onClick={async () => {
+                if (!genericLogFormData.category || !genericLogFormData.notes) {
+                  alert('Please fill in category and notes');
+                  return;
+                }
+                try {
+                  await api.logGeneric(
+                    selectedPet!.entry_id,
+                    genericLogFormData.category,
+                    genericLogFormData.notes,
+                    genericLogFormData.timestamp || undefined
+                  );
+                  setShowGenericLogDialog(false);
+                  setGenericLogFormData({category: '', notes: '', timestamp: ''});
+                  // Reload data
+                  const data = await api.getStoreDump(selectedPet!.entry_id);
+                  setStoreData(data);
+                } catch (error) {
+                  console.error('Failed to log generic entry:', error);
+                  alert('Failed to log entry. See console for details.');
+                }
+              }}>Submit</button>
+              <button style={styles.actionButton} onClick={() => setShowGenericLogDialog(false)}>Cancel</button>
             </div>
           </div>
         </div>
