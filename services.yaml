@@ -531,3 +531,34 @@ log_vomit:
       selector:
         text:
           multiline: true
+
+log_generic:
+  name: Log generic entry
+  description: Record a generic log entry for a pet with a custom category
+  fields:
+    config_entry_id:
+      name: Pet
+      description: The pet this log entry is for
+      required: true
+      selector:
+        config_entry:
+          integration: pet_health
+    category:
+      name: Category
+      description: The category for this log entry (must be configured in pet options first)
+      required: true
+      selector:
+        text:
+    notes:
+      name: Notes
+      description: Notes or details about this log entry
+      required: true
+      selector:
+        text:
+          multiline: true
+    logged_at:
+      name: Logged at
+      description: When this occurred. If not specified, uses current time.
+      required: false
+      selector:
+        datetime:
