@@ -18,6 +18,7 @@ CONF_PET_IMAGE_PATH = "pet_image_path"
 
 # Options keys
 CONF_MEDICATIONS = "medications"
+CONF_GENERIC_LOG_CATEGORIES = "generic_log_categories"
 
 # Medication config keys
 CONF_MEDICATION_ID = "medication_id"
@@ -30,6 +31,10 @@ CONF_MEDICATION_START_DATE = "start_date"
 CONF_MEDICATION_ACTIVE = "active"
 CONF_MEDICATION_NOTES = "notes"
 
+# Generic log category config keys
+CONF_CATEGORY_ID = "category_id"
+CONF_CATEGORY_NAME = "category_name"
+
 # Storage
 STORAGE_VERSION = 1
 STORAGE_KEY_VISITS = "pet_health_visits"
@@ -41,6 +46,7 @@ STORAGE_KEY_APPETITE_LEVELS = "pet_health_appetite_levels"
 STORAGE_KEY_WELLBEING = "pet_health_wellbeing"
 STORAGE_KEY_WEIGHT = "pet_health_weight"
 STORAGE_KEY_VOMIT = "pet_health_vomit"
+STORAGE_KEY_GENERIC_LOGS = "pet_health_generic_logs"
 
 # Service names
 SERVICE_LOG_BATHROOM_VISIT = "log_bathroom_visit"
@@ -56,6 +62,7 @@ SERVICE_LOG_APPETITE = "log_appetite"
 SERVICE_LOG_WELLBEING = "log_wellbeing"
 SERVICE_LOG_WEIGHT = "log_weight"
 SERVICE_LOG_VOMIT = "log_vomit"
+SERVICE_LOG_GENERIC = "log_generic"
 
 # Service attributes
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
@@ -87,6 +94,10 @@ ATTR_LOGGED_AT = "logged_at"
 # Weight and vomiting attributes
 ATTR_WEIGHT_GRAMS = "weight_grams"
 ATTR_VOMIT_TYPE = "vomit_type"
+
+# Generic log attributes
+ATTR_CATEGORY = "category"
+ATTR_CATEGORY_ID = "category_id"
 
 
 class PetType(StrEnum):

@@ -27,6 +27,9 @@ from homeassistant.helpers.selector import (
 from homeassistant.util import slugify
 
 from .const import (
+    CONF_CATEGORY_ID,
+    CONF_CATEGORY_NAME,
+    CONF_GENERIC_LOG_CATEGORIES,
     CONF_MEDICATION_ACTIVE,
     CONF_MEDICATION_DOSAGE,
     CONF_MEDICATION_FREQUENCY,
@@ -127,6 +130,8 @@ class PetHealthOptionsFlow(OptionsFlow):
 
     _medication_id: str | None = None
     _editing_medication: dict[str, Any] | None = None
+    _category_id: str | None = None
+    _editing_category: dict[str, Any] | None = None
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -150,6 +155,8 @@ class PetHealthOptionsFlow(OptionsFlow):
                 return await self.async_step_edit_image()
             if action == "medications":
                 return await self.async_step_medication_list()
+            if action == "categories":
+                return await self.async_step_category_list()
             return self.async_create_entry(title="", data={})
 
         return self.async_show_form(
@@ -161,6 +168,7 @@ class PetHealthOptionsFlow(OptionsFlow):
                             options=[
                                 {"label": "Edit pet image", "value": "edit_image"},
                                 {"label": "Manage medications", "value": "medications"},
+                                {"label": "Manage log categories", "value": "categories"},
                                 {"label": "Done", "value": "done"},
                             ],
                             mode=SelectSelectorMode.LIST,
@@ -434,6 +442,142 @@ class PetHealthOptionsFlow(OptionsFlow):
                     vol.Optional(
                         CONF_MEDICATION_NOTES,
                         default=self._editing_medication.get(CONF_MEDICATION_NOTES, ""),
+                    ): TextSelector(),
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_category_list(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show list of generic log categories."""
+        if user_input is not None:
+            action = user_input.get("action")
+            if action == "add":
+                return await self.async_step_add_category()
+            if action and action.startswith("edit_"):
+                self._category_id = action[5:]
+                categories = self.config_entry.options.get(CONF_GENERIC_LOG_CATEGORIES, [])
+                self._editing_category = next(
+                    (
+                        c
+                        for c in categories
+                        if c[CONF_CATEGORY_ID] == self._category_id
+                    ),
+                    None,
+                )
+                return await self.async_step_edit_category()
+            if action and action.startswith("delete_"):
+                cat_id = action[7:]
+                categories = list(self.config_entry.options.get(CONF_GENERIC_LOG_CATEGORIES, []))
+                categories = [
+                    c for c in categories if c[CONF_CATEGORY_ID] != cat_id
+                ]
+                return self.async_create_entry(
+                    title="",
+                    data={CONF_GENERIC_LOG_CATEGORIES: categories},
+                )
+            return self.async_create_entry(title="", data={})
+
+        # Build category list options
+        categories = self.config_entry.options.get(CONF_GENERIC_LOG_CATEGORIES, [])
+        actions = [{"label": "Add new category", "value": "add"}]
+
+        for cat in categories:
+            actions.append(
+                {"label": f"✏️  {cat[CONF_CATEGORY_NAME]}", "value": f"edit_{cat[CONF_CATEGORY_ID]}"}
+            )
+            actions.append(
+                {
+                    "label": f"🗑️  Delete {cat[CONF_CATEGORY_NAME]}",
+                    "value": f"delete_{cat[CONF_CATEGORY_ID]}",
+                }
+            )
+
+        actions.append({"label": "Done", "value": "done"})
+
+        return self.async_show_form(
+            step_id="category_list",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("action"): SelectSelector(
+                        SelectSelectorConfig(
+                            options=actions, mode=SelectSelectorMode.LIST
+                        )
+                    )
+                }
+            ),
+            description_placeholders={"pet_name": self.config_entry.title},
+        )
+
+    async def async_step_add_category(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Add a new generic log category."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            if not user_input.get(CONF_CATEGORY_NAME, "").strip():
+                errors[CONF_CATEGORY_NAME] = "empty_name"
+            else:
+                category = {
+                    CONF_CATEGORY_ID: uuid4().hex,
+                    CONF_CATEGORY_NAME: user_input[CONF_CATEGORY_NAME].strip(),
+                }
+
+                categories = list(self.config_entry.options.get(CONF_GENERIC_LOG_CATEGORIES, []))
+                categories.append(category)
+
+                return self.async_create_entry(
+                    title="",
+                    data={CONF_GENERIC_LOG_CATEGORIES: categories},
+                )
+
+        return self.async_show_form(
+            step_id="add_category",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_CATEGORY_NAME): TextSelector(),
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_edit_category(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Edit an existing generic log category."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            if not user_input.get(CONF_CATEGORY_NAME, "").strip():
+                errors[CONF_CATEGORY_NAME] = "empty_name"
+            else:
+                categories = list(self.config_entry.options.get(CONF_GENERIC_LOG_CATEGORIES, []))
+                for i, cat in enumerate(categories):
+                    if cat[CONF_CATEGORY_ID] == self._category_id:
+                        categories[i] = {
+                            CONF_CATEGORY_ID: self._category_id,
+                            CONF_CATEGORY_NAME: user_input[CONF_CATEGORY_NAME].strip(),
+                        }
+                        break
+
+                return self.async_create_entry(
+                    title="",
+                    data={CONF_GENERIC_LOG_CATEGORIES: categories},
+                )
+
+        if not self._editing_category:
+            return await self.async_step_category_list()
+
+        return self.async_show_form(
+            step_id="edit_category",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_CATEGORY_NAME,
+                        default=self._editing_category[CONF_CATEGORY_NAME],
                     ): TextSelector(),
                 }
             ),
