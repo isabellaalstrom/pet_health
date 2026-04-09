@@ -10,7 +10,7 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 import logging
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_GENERIC_LOG_CATEGORIES
 from .store import PetHealthStore
 
 
@@ -121,6 +121,17 @@ async def handle_get_pet_data(
                 }
             )
 
+        # Include configured generic log categories for this pet
+        pet_categories = []
+        configured_categories = entry.options.get(CONF_GENERIC_LOG_CATEGORIES, [])
+        for cat in configured_categories:
+            pet_categories.append(
+                {
+                    "category_id": cat.get("category_id"),
+                    "category_name": cat.get("category_name"),
+                }
+            )
+
         # Include fields at both root and in data object for backward compatibility
         # Frontend accesses entry.data.pet_image_path, while some code may use root-level fields
         entries.append(
@@ -138,6 +149,7 @@ async def handle_get_pet_data(
                     "pet_image_path": entry.data.get("pet_image_path"),
                 },
                 "medications": pet_medications,
+                "generic_log_categories": pet_categories,
             }
         )
 
