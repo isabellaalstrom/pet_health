@@ -1835,11 +1835,14 @@ function App({ hass }: AppProps) {
                   return;
                 }
                 try {
+                  const timestampIso = genericLogFormData.timestamp
+                    ? new Date(genericLogFormData.timestamp).toISOString()
+                    : undefined;
                   await api.logGeneric(
                     selectedPet!.entry_id,
                     genericLogFormData.category,
                     genericLogFormData.notes,
-                    genericLogFormData.timestamp || undefined
+                    timestampIso
                   );
                   setShowGenericLogDialog(false);
                   setGenericLogFormData({category: '', notes: '', timestamp: ''});
