@@ -518,22 +518,35 @@ class PetHealthOptionsFlow(OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            if not user_input.get(CONF_CATEGORY_NAME, "").strip():
+            raw_name = user_input.get(CONF_CATEGORY_NAME, "")
+            name = raw_name.strip()
+
+            if not name:
                 errors[CONF_CATEGORY_NAME] = "empty_name"
             else:
-                category = {
-                    CONF_CATEGORY_ID: uuid4().hex,
-                    CONF_CATEGORY_NAME: user_input[CONF_CATEGORY_NAME].strip(),
+                # Enforce case-insensitive unique category names
+                categories = list(
+                    self.config_entry.options.get(CONF_GENERIC_LOG_CATEGORIES, [])
+                )
+                existing_names = {
+                    c.get(CONF_CATEGORY_NAME, "").strip().casefold()
+                    for c in categories
                 }
 
-                categories = list(self.config_entry.options.get(CONF_GENERIC_LOG_CATEGORIES, []))
-                categories.append(category)
+                if name.casefold() in existing_names:
+                    errors[CONF_CATEGORY_NAME] = "duplicate_name"
+                else:
+                    category = {
+                        CONF_CATEGORY_ID: uuid4().hex,
+                        CONF_CATEGORY_NAME: name,
+                    }
 
-                return self.async_create_entry(
-                    title="",
-                    data={CONF_GENERIC_LOG_CATEGORIES: categories},
-                )
+                    categories.append(category)
 
+                    return self.async_create_entry(
+                        title="",
+                        data={CONF_GENERIC_LOG_CATEGORIES: categories},
+                    )
         return self.async_show_form(
             step_id="add_category",
             data_schema=vol.Schema(
