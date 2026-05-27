@@ -195,6 +195,30 @@
       },
       "weekly_vomit_count": {
         "name": "Weekly vomit count"
+      },
+      "last_blood_glucose": {
+        "name": "Last blood glucose measurement"
+      },
+      "current_blood_glucose": {
+        "name": "Current blood glucose"
+      },
+      "last_glycated_hemoglobin": {
+        "name": "Last HbA1c measurement"
+      },
+      "current_glycated_hemoglobin": {
+        "name": "Current HbA1c"
+      },
+      "last_ketone": {
+        "name": "Last ketone measurement"
+      },
+      "current_ketone_value": {
+        "name": "Current ketone value"
+      },
+      "last_generic_log": {
+        "name": "Last {category_name} log"
+      },
+      "daily_generic_log_count": {
+        "name": "Daily {category_name} entries"
       }
     }
   },
