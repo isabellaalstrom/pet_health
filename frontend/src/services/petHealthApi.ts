@@ -138,6 +138,78 @@ export class PetHealthAPI {
     await this.hass.callService('pet_health', 'log_generic', data);
   }
 
+  async logDrink(entryId: string, amount: string, notes?: string, loggedAt?: string): Promise<void> {
+    const data: Record<string, unknown> = {
+      config_entry_id: entryId,
+      amount,
+    };
+    if (notes) data.notes = notes;
+    if (loggedAt) data.logged_at = loggedAt;
+    await this.hass.callService('pet_health', 'log_drink', data);
+  }
+
+  async logMeal(entryId: string, amount: string, foodType?: string, notes?: string, loggedAt?: string): Promise<void> {
+    const data: Record<string, unknown> = {
+      config_entry_id: entryId,
+      amount,
+    };
+    if (foodType) data.food_type = foodType;
+    if (notes) data.notes = notes;
+    if (loggedAt) data.logged_at = loggedAt;
+    await this.hass.callService('pet_health', 'log_meal', data);
+  }
+
+  async logThirst(entryId: string, level: string, notes?: string, loggedAt?: string): Promise<void> {
+    const data: Record<string, unknown> = {
+      config_entry_id: entryId,
+      level,
+    };
+    if (notes) data.notes = notes;
+    if (loggedAt) data.logged_at = loggedAt;
+    await this.hass.callService('pet_health', 'log_thirst', data);
+  }
+
+  async logAppetite(entryId: string, level: string, notes?: string, loggedAt?: string): Promise<void> {
+    const data: Record<string, unknown> = {
+      config_entry_id: entryId,
+      level,
+    };
+    if (notes) data.notes = notes;
+    if (loggedAt) data.logged_at = loggedAt;
+    await this.hass.callService('pet_health', 'log_appetite', data);
+  }
+
+  async logWellbeing(entryId: string, wellbeingScore: string, symptoms: string[], notes?: string, loggedAt?: string): Promise<void> {
+    const data: Record<string, unknown> = {
+      config_entry_id: entryId,
+      wellbeing_score: wellbeingScore,
+    };
+    if (symptoms.length > 0) data.symptoms = symptoms;
+    if (notes) data.notes = notes;
+    if (loggedAt) data.logged_at = loggedAt;
+    await this.hass.callService('pet_health', 'log_wellbeing', data);
+  }
+
+  async logWeight(entryId: string, weightGrams: number, notes?: string, loggedAt?: string): Promise<void> {
+    const data: Record<string, unknown> = {
+      config_entry_id: entryId,
+      weight_grams: weightGrams,
+    };
+    if (notes) data.notes = notes;
+    if (loggedAt) data.logged_at = loggedAt;
+    await this.hass.callService('pet_health', 'log_weight', data);
+  }
+
+  async logVomit(entryId: string, vomitType: string, notes?: string, loggedAt?: string): Promise<void> {
+    const data: Record<string, unknown> = {
+      config_entry_id: entryId,
+      vomit_type: vomitType,
+    };
+    if (notes) data.notes = notes;
+    if (loggedAt) data.logged_at = loggedAt;
+    await this.hass.callService('pet_health', 'log_vomit', data);
+  }
+
   subscribeToDataUpdates(callback: () => void): Promise<() => void> {
     return this.hass.connection.subscribeEvents(callback, 'pet_health_data_updated');
   }
