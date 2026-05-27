@@ -148,6 +148,32 @@ export interface GenericLog {
   notes: string;
 }
 
+export interface BloodGlucoseRecord {
+  timestamp: string;
+  pet_id: string;
+  value: number;
+  monitor_type: string;
+  measurement_location: string;
+  notes?: string;
+}
+
+export interface GlycatedHemoglobinRecord {
+  timestamp: string;
+  pet_id: string;
+  value: number;
+  measurement_location: string;
+  notes?: string;
+}
+
+export interface KetoneRecord {
+  timestamp: string;
+  pet_id: string;
+  value: number;
+  sample_type: string;
+  measurement_location: string;
+  notes?: string;
+}
+
 export interface StoreData {
   visits?: Visit[];
   medications?: Record<string, MedicationLog[]>;
@@ -159,6 +185,9 @@ export interface StoreData {
   appetite_levels?: AppetiteLevelRecord[];
   wellbeing?: WellbeingRecord[];
   generic_logs?: GenericLog[];
+  blood_glucose?: BloodGlucoseRecord[];
+  glycated_hemoglobin?: GlycatedHemoglobinRecord[];
+  ketones?: KetoneRecord[];
 }
 
 // View types

@@ -245,6 +245,9 @@ async def handle_get_store_dump(
     pet_ids.update(getattr(store, "_weight_data", {}).keys())
     pet_ids.update(getattr(store, "_vomit_data", {}).keys())
     pet_ids.update(getattr(store, "_generic_logs_data", {}).keys())
+    pet_ids.update(getattr(store, "_blood_glucose_data", {}).keys())
+    pet_ids.update(getattr(store, "_glycated_hemoglobin_data", {}).keys())
+    pet_ids.update(getattr(store, "_ketones_data", {}).keys())
 
     if requested_pet:
         pet_ids = {requested_pet}
@@ -262,6 +265,11 @@ async def handle_get_store_dump(
         weight = [w.to_dict() for w in store.get_weight_records(pid)]
         vomit = [v.to_dict() for v in store.get_vomit_records(pid)]
         generic_logs = [g.to_dict() for g in store.get_generic_logs(pid)]
+        blood_glucose = [b.to_dict() for b in store.get_blood_glucose_records(pid)]
+        glycated_hemoglobin = [
+            g.to_dict() for g in store.get_glycated_hemoglobin_records(pid)
+        ]
+        ketones = [k.to_dict() for k in store.get_ketone_records(pid)]
 
         # sort each list by timestamp desc
         for lst in (
@@ -275,6 +283,9 @@ async def handle_get_store_dump(
             weight,
             vomit,
             generic_logs,
+            blood_glucose,
+            glycated_hemoglobin,
+            ketones,
         ):
             lst.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
 
@@ -289,6 +300,9 @@ async def handle_get_store_dump(
             "weight": weight,
             "vomit": vomit,
             "generic_logs": generic_logs,
+            "blood_glucose": blood_glucose,
+            "glycated_hemoglobin": glycated_hemoglobin,
+            "ketones": ketones,
         }
 
         _LOGGER.debug(
@@ -305,6 +319,9 @@ async def handle_get_store_dump(
                 "weight": len(weight),
                 "vomit": len(vomit),
                 "generic_logs": len(generic_logs),
+                "blood_glucose": len(blood_glucose),
+                "glycated_hemoglobin": len(glycated_hemoglobin),
+                "ketones": len(ketones),
             },
         )
 

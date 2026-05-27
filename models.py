@@ -12,7 +12,10 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from .const import (
     DOMAIN,
     ConsumptionAmount,
+    GlucoseMonitorType,
+    KetoneSampleType,
     LevelState,
+    MeasurementLocation,
     PetType,
     PoopColor,
     PoopConsistency,
@@ -380,6 +383,114 @@ class GenericLog:
             category=data["category"],
             notes=data["notes"],
             log_id=data.get("log_id", str(uuid.uuid4())),
+        )
+
+
+@dataclass
+class BloodGlucoseRecord:
+    """Data model for a blood glucose measurement."""
+
+    timestamp: datetime
+    pet_id: str
+    value: float
+    monitor_type: GlucoseMonitorType = GlucoseMonitorType.PET_MONITOR
+    measurement_location: MeasurementLocation = MeasurementLocation.HOME
+    notes: str | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage."""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "pet_id": self.pet_id,
+            "value": self.value,
+            "monitor_type": self.monitor_type,
+            "measurement_location": self.measurement_location,
+            "notes": self.notes,
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> BloodGlucoseRecord:
+        """Create from dictionary."""
+        return BloodGlucoseRecord(
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            pet_id=data["pet_id"],
+            value=float(data["value"]),
+            monitor_type=GlucoseMonitorType(data.get("monitor_type", "pet_monitor")),
+            measurement_location=MeasurementLocation(
+                data.get("measurement_location", "home")
+            ),
+            notes=data.get("notes"),
+        )
+
+
+@dataclass
+class GlycatedHemoglobinRecord:
+    """Data model for a glycated hemoglobin (HbA1c / långtidssocker) measurement."""
+
+    timestamp: datetime
+    pet_id: str
+    value: float
+    measurement_location: MeasurementLocation = MeasurementLocation.VET
+    notes: str | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage."""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "pet_id": self.pet_id,
+            "value": self.value,
+            "measurement_location": self.measurement_location,
+            "notes": self.notes,
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> GlycatedHemoglobinRecord:
+        """Create from dictionary."""
+        return GlycatedHemoglobinRecord(
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            pet_id=data["pet_id"],
+            value=float(data["value"]),
+            measurement_location=MeasurementLocation(
+                data.get("measurement_location", "vet")
+            ),
+            notes=data.get("notes"),
+        )
+
+
+@dataclass
+class KetoneRecord:
+    """Data model for a ketone measurement."""
+
+    timestamp: datetime
+    pet_id: str
+    value: float
+    sample_type: KetoneSampleType = KetoneSampleType.URINE
+    measurement_location: MeasurementLocation = MeasurementLocation.HOME
+    notes: str | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage."""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "pet_id": self.pet_id,
+            "value": self.value,
+            "sample_type": self.sample_type,
+            "measurement_location": self.measurement_location,
+            "notes": self.notes,
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> KetoneRecord:
+        """Create from dictionary."""
+        return KetoneRecord(
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            pet_id=data["pet_id"],
+            value=float(data["value"]),
+            sample_type=KetoneSampleType(data.get("sample_type", "urine")),
+            measurement_location=MeasurementLocation(
+                data.get("measurement_location", "home")
+            ),
+            notes=data.get("notes"),
         )
 
 
