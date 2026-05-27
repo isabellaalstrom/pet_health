@@ -10,7 +10,13 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 import logging
 
-from .const import DOMAIN, CONF_GENERIC_LOG_CATEGORIES
+from .const import (
+    CONF_CATEGORY_ID,
+    CONF_CATEGORY_NAME,
+    CONF_GENERIC_LOG_CATEGORIES,
+    DEFAULT_GENERIC_LOG_CATEGORIES,
+    DOMAIN,
+)
 from .store import PetHealthStore
 
 
@@ -124,11 +130,21 @@ async def handle_get_pet_data(
         # Include configured generic log categories for this pet
         pet_categories = []
         configured_categories = entry.options.get(CONF_GENERIC_LOG_CATEGORIES, [])
-        for cat in configured_categories:
+        seen_category_names: set[str] = set()
+        for cat in [*configured_categories, *DEFAULT_GENERIC_LOG_CATEGORIES]:
+            category_name = cat.get(CONF_CATEGORY_NAME)
+            if not category_name:
+                continue
+
+            category_key = category_name.casefold()
+            if category_key in seen_category_names:
+                continue
+            seen_category_names.add(category_key)
+
             pet_categories.append(
                 {
-                    "category_id": cat.get("category_id"),
-                    "category_name": cat.get("category_name"),
+                    CONF_CATEGORY_ID: cat.get(CONF_CATEGORY_ID),
+                    CONF_CATEGORY_NAME: category_name,
                 }
             )
 
