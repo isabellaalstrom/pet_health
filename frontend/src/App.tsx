@@ -483,7 +483,7 @@ function App({ hass }: AppProps) {
 
   // Wellbeing dialog
   const [showWellbeingDialog, setShowWellbeingDialog] = useState(false);
-  const [wellbeingFormData, setWellbeingFormData] = useState({ wellbeing_score: 'good', symptoms: '' as string, notes: '', timestamp: '' });
+  const [wellbeingFormData, setWellbeingFormData] = useState({ wellbeing_score: 'good', symptoms: '', notes: '', timestamp: '' });
 
   // Weight dialog
   const [showWeightDialog, setShowWeightDialog] = useState(false);
