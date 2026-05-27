@@ -403,8 +403,8 @@ class BloodGlucoseRecord:
             "timestamp": self.timestamp.isoformat(),
             "pet_id": self.pet_id,
             "value": self.value,
-            "monitor_type": self.monitor_type,
-            "measurement_location": self.measurement_location,
+            "monitor_type": self.monitor_type.value,
+            "measurement_location": self.measurement_location.value,
             "notes": self.notes,
         }
 
@@ -439,7 +439,7 @@ class GlycatedHemoglobinRecord:
             "timestamp": self.timestamp.isoformat(),
             "pet_id": self.pet_id,
             "value": self.value,
-            "measurement_location": self.measurement_location,
+            "measurement_location": self.measurement_location.value,
             "notes": self.notes,
         }
 
@@ -474,8 +474,8 @@ class KetoneRecord:
             "timestamp": self.timestamp.isoformat(),
             "pet_id": self.pet_id,
             "value": self.value,
-            "sample_type": self.sample_type,
-            "measurement_location": self.measurement_location,
+            "sample_type": self.sample_type.value,
+            "measurement_location": self.measurement_location.value,
             "notes": self.notes,
         }
 

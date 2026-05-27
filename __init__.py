@@ -26,6 +26,7 @@ from .const import (
     ATTR_FOOD_TYPE,
     ATTR_GIVEN_AT,
     ATTR_GLUCOSE_VALUE,
+    ATTR_HBA1C_VALUE,
     ATTR_KETONE_VALUE,
     ATTR_LEVEL,
     ATTR_LOGGED_AT,
@@ -297,7 +298,7 @@ SERVICE_LOG_BLOOD_GLUCOSE_SCHEMA = vol.Schema(
 SERVICE_LOG_GLYCATED_HEMOGLOBIN_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
-        vol.Required(ATTR_GLUCOSE_VALUE): vol.All(
+        vol.Required(ATTR_HBA1C_VALUE): vol.All(
             vol.Coerce(float), vol.Range(min=0.1, max=30.0)
         ),
         vol.Optional(ATTR_MEASUREMENT_LOCATION, default="vet"): vol.In(
@@ -1183,7 +1184,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         record = GlycatedHemoglobinRecord(
             timestamp=logged_at,
             pet_id=pet_data.pet_id,
-            value=call.data[ATTR_GLUCOSE_VALUE],
+            value=call.data[ATTR_HBA1C_VALUE],
             measurement_location=MeasurementLocation(
                 call.data.get(ATTR_MEASUREMENT_LOCATION, "vet")
             ),
