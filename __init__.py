@@ -1109,7 +1109,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             vet_visit_log.timestamp,
         )
 
-        response: dict[str, str | int | ServiceResponse] = {
+        response = {
             "log_id": vet_visit_log.log_id,
             "timestamp": vet_visit_log.timestamp.isoformat(),
             "pet_name": pet_data.name,

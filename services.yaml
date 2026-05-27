@@ -531,7 +531,7 @@ log_vet_visit:
           multiline: true
     weight_grams:
       name: Weight (grams)
-      description: Optional weight measured at the vet. When provided, this is also logged through Log weight.
+      description: Optional weight measured at the vet. When provided, this is also logged through log_weight.
       required: false
       selector:
         number:
