@@ -10,7 +10,11 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 import logging
 
-from .const import DOMAIN, CONF_GENERIC_LOG_CATEGORIES
+from .const import (
+    CONF_ENABLE_BATHROOM_VISITS,
+    CONF_GENERIC_LOG_CATEGORIES,
+    DOMAIN,
+)
 from .store import PetHealthStore
 
 
@@ -142,6 +146,9 @@ async def handle_get_pet_data(
                 "pet_name": entry.data.get("pet_name"),
                 "pet_type": entry.data.get("pet_type"),
                 "pet_image_path": entry.data.get("pet_image_path"),
+                "enable_bathroom_visits": entry.options.get(
+                    CONF_ENABLE_BATHROOM_VISITS, True
+                ),
                 "data": {
                     "pet_id": entry.data.get("pet_id"),
                     "pet_name": entry.data.get("pet_name"),

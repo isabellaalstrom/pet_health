@@ -14,7 +14,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_MEDICATIONS, DOMAIN
+from .const import CONF_ENABLE_BATHROOM_VISITS, CONF_MEDICATIONS, DOMAIN
 from .models import BathroomVisit, MedicationRecord, PetHealthConfigEntry
 from .store import PetHealthStore
 
@@ -29,16 +29,6 @@ async def async_setup_entry(
     pet_data = entry.runtime_data
 
     sensors: list[SensorEntity] = [
-        LastVisitTimestampSensor(entry, store, pet_data.pet_id),
-        DailyVisitCountSensor(entry, store, pet_data.pet_id),
-        WeeklyVisitCountSensor(entry, store, pet_data.pet_id),
-        HoursSinceLastVisitSensor(entry, store, pet_data.pet_id),
-        LastPoopConsistencySensor(entry, store, pet_data.pet_id),
-        LastPoopColorSensor(entry, store, pet_data.pet_id),
-        LastUrineAmountSensor(entry, store, pet_data.pet_id),
-        DailyPeeCountSensor(entry, store, pet_data.pet_id),
-        DailyPoopCountSensor(entry, store, pet_data.pet_id),
-        UnconfirmedVisitsCountSensor(entry, store, pet_data.pet_id),
         # Drink sensors (consumption)
         LastDrinkTimestampSensor(entry, store, pet_data.pet_id),
         DailyDrinkCountSensor(entry, store, pet_data.pet_id),
@@ -57,6 +47,22 @@ async def async_setup_entry(
         LastWellbeingAssessmentSensor(entry, store, pet_data.pet_id),
         CurrentWellbeingScoreSensor(entry, store, pet_data.pet_id),
     ]
+
+    if entry.options.get(CONF_ENABLE_BATHROOM_VISITS, True):
+        sensors.extend(
+            [
+                LastVisitTimestampSensor(entry, store, pet_data.pet_id),
+                DailyVisitCountSensor(entry, store, pet_data.pet_id),
+                WeeklyVisitCountSensor(entry, store, pet_data.pet_id),
+                HoursSinceLastVisitSensor(entry, store, pet_data.pet_id),
+                LastPoopConsistencySensor(entry, store, pet_data.pet_id),
+                LastPoopColorSensor(entry, store, pet_data.pet_id),
+                LastUrineAmountSensor(entry, store, pet_data.pet_id),
+                DailyPeeCountSensor(entry, store, pet_data.pet_id),
+                DailyPoopCountSensor(entry, store, pet_data.pet_id),
+                UnconfirmedVisitsCountSensor(entry, store, pet_data.pet_id),
+            ]
+        )
 
     # Add medication sensors for each configured medication
     medications = entry.options.get(CONF_MEDICATIONS, [])

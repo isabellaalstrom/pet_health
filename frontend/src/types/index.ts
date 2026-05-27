@@ -17,6 +17,7 @@ export interface PetEntry {
   name?: string;
   pet_type?: string;
   pet_image_path?: string;
+  enable_bathroom_visits?: boolean;
   medications?: Medication[];
   generic_log_categories?: Category[];
 }

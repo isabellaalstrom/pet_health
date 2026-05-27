@@ -603,6 +603,13 @@ function App({ hass }: AppProps) {
     pets.find(p => p.entry_id === selectedPetId),
     [pets, selectedPetId]
   );
+  const bathroomVisitsEnabled = selectedPet?.enable_bathroom_visits !== false;
+
+  useEffect(() => {
+    if (currentView === 'visits' && !bathroomVisitsEnabled) {
+      setCurrentView('dashboard');
+    }
+  }, [bathroomVisitsEnabled, currentView]);
 
   const getPetName = (pet: PetEntry) => {
     return pet.pet_name || pet.name || pet.title || 'Unknown Pet';
@@ -1076,21 +1083,23 @@ function App({ hass }: AppProps) {
         >
           Dashboard
         </button>
-        <div style={styles.badgeContainer}>
-          <button
-            style={currentView === 'visits'
-              ? {...s('navButton'), ...styles.navButtonActive}
-              : s('navButton')}
-            onClick={() => setCurrentView('visits')}
-          >
-            Bathroom Visits
-          </button>
-          {(totalUnconfirmedVisits > 0 || unknownVisits.length > 0) && (
-            <div style={styles.badge}>
-              {totalUnconfirmedVisits + unknownVisits.length}
-            </div>
-          )}
-        </div>
+        {bathroomVisitsEnabled && (
+          <div style={styles.badgeContainer}>
+            <button
+              style={currentView === 'visits'
+                ? {...s('navButton'), ...styles.navButtonActive}
+                : s('navButton')}
+              onClick={() => setCurrentView('visits')}
+            >
+              Bathroom Visits
+            </button>
+            {(totalUnconfirmedVisits > 0 || unknownVisits.length > 0) && (
+              <div style={styles.badge}>
+                {totalUnconfirmedVisits + unknownVisits.length}
+              </div>
+            )}
+          </div>
+        )}
         <button
           style={currentView === 'medications'
             ? {...s('navButton'), ...styles.navButtonActive}
@@ -1129,32 +1138,36 @@ function App({ hass }: AppProps) {
         <div style={{display: "flex", flexDirection: "column", gap: isMobile ? "16px" : "24px"}}>
           <div style={s('card')}>
             <h2 style={s('h2')}>Dashboard for {getPetName(selectedPet)}</h2>
-            <div style={styles.stats}>
-              <div style={styles.statCard}>
-                <div style={styles.statLabel}>Total Visits</div>
-                <div style={styles.statValue}>{visits.length}</div>
-              </div>
-              <div style={styles.statCard}>
-                <div style={styles.statLabel}>Today's Visits</div>
-                <div style={styles.statValue}>
-                  {visits.filter(v => {
-                    const visitDate = new Date(v.timestamp);
-                    const today = new Date();
-                    return visitDate.toDateString() === today.toDateString();
-                  }).length}
-                </div>
-              </div>
-              {unknownVisits.length > 0 && (
+            {bathroomVisitsEnabled && (
+              <div style={styles.stats}>
                 <div style={styles.statCard}>
-                  <div style={styles.statLabel}>Unknown Visits</div>
-                  <div style={styles.statValue}>{unknownVisits.length}</div>
+                  <div style={styles.statLabel}>Total Visits</div>
+                  <div style={styles.statValue}>{visits.length}</div>
                 </div>
-              )}
-            </div>
+                <div style={styles.statCard}>
+                  <div style={styles.statLabel}>Today's Visits</div>
+                  <div style={styles.statValue}>
+                    {visits.filter(v => {
+                      const visitDate = new Date(v.timestamp);
+                      const today = new Date();
+                      return visitDate.toDateString() === today.toDateString();
+                    }).length}
+                  </div>
+                </div>
+                {unknownVisits.length > 0 && (
+                  <div style={styles.statCard}>
+                    <div style={styles.statLabel}>Unknown Visits</div>
+                    <div style={styles.statValue}>{unknownVisits.length}</div>
+                  </div>
+                )}
+              </div>
+            )}
             <div style={s('actionButtons')}>
-              <button style={s('actionButton')} onClick={handleLogVisit}>
-                Log Bathroom Visit
-              </button>
+              {bathroomVisitsEnabled && (
+                <button style={s('actionButton')} onClick={handleLogVisit}>
+                  Log Bathroom Visit
+                </button>
+              )}
               <button style={s('actionButton')} onClick={handleLogMedication}>
                 Log Medication
               </button>
@@ -1163,7 +1176,7 @@ function App({ hass }: AppProps) {
         </div>
       )}
 
-      {currentView === 'visits' && selectedPet && (
+      {currentView === 'visits' && selectedPet && bathroomVisitsEnabled && (
         <div style={{display: "flex", flexDirection: "column", gap: isMobile ? "16px" : "24px"}}>
           {unknownVisits.length > 0 && (
             <div style={s('card')}>
