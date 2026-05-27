@@ -48,6 +48,7 @@ from .const import (
     CONF_CATEGORY_NAME,
     CONF_GENERIC_LOG_CATEGORIES,
     CONF_MEDICATION_DOSAGE,
+    CONF_MEDICATION_FREQUENCY,
     CONF_MEDICATION_ID,
     CONF_MEDICATION_NAME,
     CONF_MEDICATION_UNIT,
@@ -521,6 +522,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             medication_name=medication_config[CONF_MEDICATION_NAME],
             dosage=call.data.get(ATTR_DOSAGE) or medication_config.get(CONF_MEDICATION_DOSAGE),
             unit=call.data.get(ATTR_UNIT) or medication_config.get(CONF_MEDICATION_UNIT),
+            frequency=medication_config.get(CONF_MEDICATION_FREQUENCY),
             reason=None,  # Not storing reason per dose
             notes=call.data.get(ATTR_NOTES),
         )

@@ -59,6 +59,7 @@ export interface Medication {
   medication_name: string;
   dosage?: string;
   unit?: string;
+  frequency?: string;
 }
 
 export interface MedicationLog {
@@ -67,6 +68,7 @@ export interface MedicationLog {
   medication_name: string;  // API returns this field name
   dosage?: string;
   unit?: string;
+  frequency?: string;
   notes?: string;
 }
 
