@@ -117,6 +117,7 @@ The integration exposes multiple services (see `services.yaml`). Key services in
 - `pet_health.log_meal` — Record food intake.
 - `pet_health.log_thirst` / `pet_health.log_appetite` / `pet_health.log_wellbeing` — Log assessments.
  - `pet_health.log_weight` — Record a weight measurement.
+ - `pet_health.log_vet_visit` — Record a vet visit and optionally log an included weight measurement.
  - `pet_health.log_vomit` — Record a vomiting incident.
 
 Example: log a bathroom visit via Developer Tools → Services
@@ -149,6 +150,16 @@ data:
   config_entry_id: <your-pet-config-entry-id>
   weight_grams: 3500
   notes: "Routine monthly weigh-in"
+```
+
+Example: log a vet visit
+
+```yaml
+service: pet_health.log_vet_visit
+data:
+  config_entry_id: <your-pet-config-entry-id>
+  notes: "Annual checkup, vaccine booster, and dental exam"
+  weight_grams: 3550
 ```
 
 Example: log a vomiting incident

@@ -212,6 +212,16 @@ export class PetHealthAPI {
     await this.hass.callService('pet_health', 'log_weight', data);
   }
 
+  async logVetVisit(entryId: string, notes: string, weightGrams?: number, loggedAt?: string): Promise<void> {
+    const data: Record<string, unknown> = {
+      config_entry_id: entryId,
+      notes,
+    };
+    if (weightGrams !== undefined) data.weight_grams = weightGrams;
+    if (loggedAt) data.logged_at = loggedAt;
+    await this.hass.callService('pet_health', 'log_vet_visit', data);
+  }
+
   async logVomit(entryId: string, vomitType: string, notes?: string, loggedAt?: string): Promise<void> {
     const data: Record<string, unknown> = {
       config_entry_id: entryId,
