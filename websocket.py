@@ -10,7 +10,7 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 import logging
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_GENERIC_LOG_CATEGORIES
 from .store import PetHealthStore
 
 
@@ -121,6 +121,17 @@ async def handle_get_pet_data(
                 }
             )
 
+        # Include configured generic log categories for this pet
+        pet_categories = []
+        configured_categories = entry.options.get(CONF_GENERIC_LOG_CATEGORIES, [])
+        for cat in configured_categories:
+            pet_categories.append(
+                {
+                    "category_id": cat.get("category_id"),
+                    "category_name": cat.get("category_name"),
+                }
+            )
+
         # Include fields at both root and in data object for backward compatibility
         # Frontend accesses entry.data.pet_image_path, while some code may use root-level fields
         entries.append(
@@ -138,6 +149,7 @@ async def handle_get_pet_data(
                     "pet_image_path": entry.data.get("pet_image_path"),
                 },
                 "medications": pet_medications,
+                "generic_log_categories": pet_categories,
             }
         )
 
@@ -232,6 +244,7 @@ async def handle_get_store_dump(
     pet_ids.update(getattr(store, "_wellbeing_data", {}).keys())
     pet_ids.update(getattr(store, "_weight_data", {}).keys())
     pet_ids.update(getattr(store, "_vomit_data", {}).keys())
+    pet_ids.update(getattr(store, "_generic_logs_data", {}).keys())
 
     if requested_pet:
         pet_ids = {requested_pet}
@@ -248,6 +261,7 @@ async def handle_get_store_dump(
         wellbeing = [w.to_dict() for w in store.get_wellbeing_records(pid)]
         weight = [w.to_dict() for w in store.get_weight_records(pid)]
         vomit = [v.to_dict() for v in store.get_vomit_records(pid)]
+        generic_logs = [g.to_dict() for g in store.get_generic_logs(pid)]
 
         # sort each list by timestamp desc
         for lst in (
@@ -260,6 +274,7 @@ async def handle_get_store_dump(
             wellbeing,
             weight,
             vomit,
+            generic_logs,
         ):
             lst.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
 
@@ -273,6 +288,7 @@ async def handle_get_store_dump(
             "wellbeing": wellbeing,
             "weight": weight,
             "vomit": vomit,
+            "generic_logs": generic_logs,
         }
 
         _LOGGER.debug(
@@ -288,6 +304,7 @@ async def handle_get_store_dump(
                 "wellbeing": len(wellbeing),
                 "weight": len(weight),
                 "vomit": len(vomit),
+                "generic_logs": len(generic_logs),
             },
         )
 

@@ -10,6 +10,7 @@ from homeassistant.helpers.storage import Store
 from .const import (
     STORAGE_KEY_APPETITE_LEVELS,
     STORAGE_KEY_DRINKS,
+    STORAGE_KEY_GENERIC_LOGS,
     STORAGE_KEY_MEALS,
     STORAGE_KEY_MEDICATIONS,
     STORAGE_KEY_THIRST_LEVELS,
@@ -23,6 +24,7 @@ from .models import (
     AppetiteLevelRecord,
     BathroomVisit,
     DrinkRecord,
+    GenericLog,
     MealRecord,
     MedicationRecord,
     ThirstLevelRecord,
@@ -65,6 +67,9 @@ class PetHealthStore:
         self._vomit_store = Store[dict[str, list[dict]]](
             hass, STORAGE_VERSION, STORAGE_KEY_VOMIT
         )
+        self._generic_logs_store = Store[dict[str, list[dict]]](
+            hass, STORAGE_VERSION, STORAGE_KEY_GENERIC_LOGS
+        )
         self._visits_data: dict[str, list[BathroomVisit]] = {}
         self._medications_data: dict[str, list[MedicationRecord]] = {}
         self._drinks_data: dict[str, list[DrinkRecord]] = {}
@@ -74,6 +79,7 @@ class PetHealthStore:
         self._wellbeing_data: dict[str, list[WellbeingRecord]] = {}
         self._weight_data: dict[str, list[WeightRecord]] = {}
         self._vomit_data: dict[str, list[VomitRecord]] = {}
+        self._generic_logs_data: dict[str, list[GenericLog]] = {}
         self._callbacks: dict[str, list[Callable]] = {}
 
     async def async_load(self) -> None:
@@ -150,6 +156,14 @@ class PetHealthStore:
             for pet_id, records in stored_vomit.items():
                 self._vomit_data[pet_id] = [
                     VomitRecord.from_dict(record) for record in records
+                ]
+
+        # Load generic logs
+        stored_generic_logs = await self._generic_logs_store.async_load()
+        if stored_generic_logs:
+            for pet_id, logs in stored_generic_logs.items():
+                self._generic_logs_data[pet_id] = [
+                    GenericLog.from_dict(log) for log in logs
                 ]
 
     async def async_save_visit(self, visit: BathroomVisit) -> None:
@@ -395,6 +409,26 @@ class PetHealthStore:
     def get_vomit_records(self, pet_id: str) -> list[VomitRecord]:
         """Get all vomit records for a pet."""
         return self._vomit_data.get(pet_id, [])
+
+    async def async_save_generic_log(self, log: GenericLog) -> None:
+        """Save a generic log."""
+        if log.pet_id not in self._generic_logs_data:
+            self._generic_logs_data[log.pet_id] = []
+        self._generic_logs_data[log.pet_id].append(log)
+
+        # Convert to storable format
+        store_data = {
+            pet_id: [l.to_dict() for l in logs]
+            for pet_id, logs in self._generic_logs_data.items()
+        }
+        await self._generic_logs_store.async_save(store_data)
+
+        # Notify callbacks to update sensors immediately
+        self._notify_callbacks(log.pet_id)
+
+    def get_generic_logs(self, pet_id: str) -> list[GenericLog]:
+        """Get all generic logs for a pet."""
+        return self._generic_logs_data.get(pet_id, [])
 
     def register_update_callback(self, pet_id: str, callback: Callable) -> None:
         """Register a callback for when data is updated."""

@@ -18,6 +18,12 @@ export interface PetEntry {
   pet_type?: string;
   pet_image_path?: string;
   medications?: Medication[];
+  generic_log_categories?: Category[];
+}
+
+export interface Category {
+  category_id: string;
+  category_name: string;
 }
 
 // Visit types
@@ -134,6 +140,14 @@ export interface VomitRecord {
   notes?: string;
 }
 
+export interface GenericLog {
+  log_id: string;
+  timestamp: string;
+  pet_id: string;
+  category: string;
+  notes: string;
+}
+
 export interface StoreData {
   visits?: Visit[];
   medications?: Record<string, MedicationLog[]>;
@@ -144,7 +158,8 @@ export interface StoreData {
   thirst_levels?: ThirstLevelRecord[];
   appetite_levels?: AppetiteLevelRecord[];
   wellbeing?: WellbeingRecord[];
+  generic_logs?: GenericLog[];
 }
 
 // View types
-export type View = 'dashboard' | 'visits' | 'medications' | 'health' | 'nutrition';
+export type View = 'dashboard' | 'visits' | 'medications' | 'health' | 'nutrition' | 'logs';

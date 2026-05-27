@@ -124,6 +124,20 @@ export class PetHealthAPI {
     });
   }
 
+  async logGeneric(entryId: string, category: string, notes: string, loggedAt?: string): Promise<void> {
+    const data: Record<string, unknown> = {
+      config_entry_id: entryId,
+      category,
+      notes,
+    };
+    
+    if (loggedAt) {
+      data.logged_at = loggedAt;
+    }
+    
+    await this.hass.callService('pet_health', 'log_generic', data);
+  }
+
   subscribeToDataUpdates(callback: () => void): Promise<() => void> {
     return this.hass.connection.subscribeEvents(callback, 'pet_health_data_updated');
   }

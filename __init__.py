@@ -17,6 +17,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     ATTR_AMOUNT,
+    ATTR_CATEGORY,
     ATTR_CONFIG_ENTRY_ID,
     ATTR_CONFIRMED,
     ATTR_DID_PEE,
@@ -39,6 +40,8 @@ from .const import (
     ATTR_VOMIT_TYPE,
     ATTR_WEIGHT_GRAMS,
     ATTR_WELLBEING_SCORE,
+    CONF_CATEGORY_NAME,
+    CONF_GENERIC_LOG_CATEGORIES,
     CONF_MEDICATION_DOSAGE,
     CONF_MEDICATION_ID,
     CONF_MEDICATION_NAME,
@@ -55,6 +58,7 @@ from .const import (
     SERVICE_LOG_APPETITE,
     SERVICE_LOG_BATHROOM_VISIT,
     SERVICE_LOG_DRINK,
+    SERVICE_LOG_GENERIC,
     SERVICE_LOG_MEAL,
     SERVICE_LOG_MEDICATION,
     SERVICE_LOG_THIRST,
@@ -76,6 +80,7 @@ from .models import (
     AppetiteLevelRecord,
     BathroomVisit,
     DrinkRecord,
+    GenericLog,
     MealRecord,
     MedicationRecord,
     PetData,
@@ -243,6 +248,16 @@ SERVICE_LOG_VOMIT_SCHEMA = vol.Schema(
         ),
         vol.Optional(ATTR_LOGGED_AT): cv.datetime,
         vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
+# Schema for log_generic service
+SERVICE_LOG_GENERIC_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Required(ATTR_CATEGORY): cv.string,
+        vol.Required(ATTR_NOTES): cv.string,
+        vol.Optional(ATTR_LOGGED_AT): cv.datetime,
     }
 )
 
@@ -957,6 +972,75 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             "vomit_type": record.vomit_type,
         }
 
+    async def handle_log_generic(call: ServiceCall) -> ServiceResponse:
+        """Handle the log_generic service call."""
+        entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
+        entry = hass.config_entries.async_get_entry(entry_id)
+
+        if not entry:
+            raise HomeAssistantError(f"Config entry {entry_id} not found")
+
+        if entry.domain != DOMAIN:
+            raise HomeAssistantError(
+                f"Config entry {entry_id} is not a pet_health entry"
+            )
+
+        pet_data: PetData = entry.runtime_data
+
+        # Validate category exists in configured categories
+        category = call.data[ATTR_CATEGORY]
+        configured_categories = entry.options.get(CONF_GENERIC_LOG_CATEGORIES, [])
+        
+        # Build a set of valid category names (case-sensitive)
+        valid_categories = {
+            cat.get(CONF_CATEGORY_NAME) 
+            for cat in configured_categories 
+            if cat.get(CONF_CATEGORY_NAME)
+        }
+        
+        if category not in valid_categories:
+            raise HomeAssistantError(
+                f"Category '{category}' is not configured for pet '{pet_data.name}'. "
+                f"Please add it in Settings → Devices & Services → Pet Health → "
+                f"Configure → Manage log categories."
+            )
+
+        # Get timestamp (use provided or current)
+        logged_at = call.data.get(ATTR_LOGGED_AT)
+        if logged_at is None:
+            logged_at = dt_util.now()
+        else:
+            logged_at = dt_util.as_utc(logged_at)
+
+        # Create generic log
+        log = GenericLog(
+            timestamp=logged_at,
+            pet_id=pet_data.pet_id,
+            category=category,
+            notes=call.data[ATTR_NOTES],
+        )
+
+        await store.async_save_generic_log(log)
+        _LOGGER.info(
+            "Logged generic entry (%s) for %s at %s",
+            log.category,
+            pet_data.name,
+            log.timestamp,
+        )
+
+        # Fire event to notify frontend
+        hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+            "pet_id": pet_data.pet_id,
+            "data_type": "generic_logs",
+        })
+
+        return {
+            "log_id": log.log_id,
+            "timestamp": log.timestamp.isoformat(),
+            "pet_name": pet_data.name,
+            "category": log.category,
+        }
+
     # Register services
     hass.services.async_register(
         DOMAIN,
@@ -1059,6 +1143,14 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         SERVICE_LOG_VOMIT,
         handle_log_vomit,
         schema=SERVICE_LOG_VOMIT_SCHEMA,
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOG_GENERIC,
+        handle_log_generic,
+        schema=SERVICE_LOG_GENERIC_SCHEMA,
         supports_response=True,
     )
 

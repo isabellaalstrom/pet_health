@@ -351,4 +351,36 @@ class VomitRecord:
         )
 
 
+@dataclass
+class GenericLog:
+    """Data model for a generic log entry."""
+
+    timestamp: datetime
+    pet_id: str
+    category: str
+    notes: str
+    log_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage."""
+        return {
+            "log_id": self.log_id,
+            "timestamp": self.timestamp.isoformat(),
+            "pet_id": self.pet_id,
+            "category": self.category,
+            "notes": self.notes,
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> GenericLog:
+        """Create from dictionary."""
+        return GenericLog(
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            pet_id=data["pet_id"],
+            category=data["category"],
+            notes=data["notes"],
+            log_id=data.get("log_id", str(uuid.uuid4())),
+        )
+
+
 type PetHealthConfigEntry = ConfigEntry[PetData]
