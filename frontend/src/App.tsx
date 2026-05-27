@@ -465,6 +465,34 @@ function App({ hass }: AppProps) {
   });
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
+  // Drink dialog
+  const [showDrinkDialog, setShowDrinkDialog] = useState(false);
+  const [drinkFormData, setDrinkFormData] = useState({ amount: 'normal', notes: '', timestamp: '' });
+
+  // Meal dialog
+  const [showMealDialog, setShowMealDialog] = useState(false);
+  const [mealFormData, setMealFormData] = useState({ amount: 'normal', food_type: '', notes: '', timestamp: '' });
+
+  // Thirst dialog
+  const [showThirstDialog, setShowThirstDialog] = useState(false);
+  const [thirstFormData, setThirstFormData] = useState({ level: 'normal', notes: '', timestamp: '' });
+
+  // Appetite dialog
+  const [showAppetiteDialog, setShowAppetiteDialog] = useState(false);
+  const [appetiteFormData, setAppetiteFormData] = useState({ level: 'normal', notes: '', timestamp: '' });
+
+  // Wellbeing dialog
+  const [showWellbeingDialog, setShowWellbeingDialog] = useState(false);
+  const [wellbeingFormData, setWellbeingFormData] = useState({ wellbeing_score: 'good', symptoms: '', notes: '', timestamp: '' });
+
+  // Weight dialog
+  const [showWeightDialog, setShowWeightDialog] = useState(false);
+  const [weightFormData, setWeightFormData] = useState({ weight_kg: '', notes: '', timestamp: '' });
+
+  // Vomit dialog
+  const [showVomitDialog, setShowVomitDialog] = useState(false);
+  const [vomitFormData, setVomitFormData] = useState({ vomit_type: 'other', notes: '', timestamp: '' });
+
   // Auto-select first pet
   useEffect(() => {
     if (pets.length > 0 && !selectedPetId) {
@@ -788,6 +816,120 @@ function App({ hass }: AppProps) {
     } catch (err) {
       console.error('Failed to log medication:', err);
       alert('Failed to log medication: ' + (err as Error).message);
+    }
+  };
+
+  const submitLogDrink = async () => {
+    if (!api || !selectedPetId) return;
+    try {
+      const loggedAt = drinkFormData.timestamp ? new Date(drinkFormData.timestamp).toISOString() : undefined;
+      await api.logDrink(selectedPetId, drinkFormData.amount, drinkFormData.notes || undefined, loggedAt);
+      setShowDrinkDialog(false);
+      setDrinkFormData({ amount: 'normal', notes: '', timestamp: '' });
+      const data = await api.getStoreDump(selectedPetId);
+      setStoreData(data);
+    } catch (err) {
+      console.error('Failed to log drink:', err);
+      alert('Failed to log drink: ' + (err as Error).message);
+    }
+  };
+
+  const submitLogMeal = async () => {
+    if (!api || !selectedPetId) return;
+    try {
+      const loggedAt = mealFormData.timestamp ? new Date(mealFormData.timestamp).toISOString() : undefined;
+      await api.logMeal(selectedPetId, mealFormData.amount, mealFormData.food_type || undefined, mealFormData.notes || undefined, loggedAt);
+      setShowMealDialog(false);
+      setMealFormData({ amount: 'normal', food_type: '', notes: '', timestamp: '' });
+      const data = await api.getStoreDump(selectedPetId);
+      setStoreData(data);
+    } catch (err) {
+      console.error('Failed to log meal:', err);
+      alert('Failed to log meal: ' + (err as Error).message);
+    }
+  };
+
+  const submitLogThirst = async () => {
+    if (!api || !selectedPetId) return;
+    try {
+      const loggedAt = thirstFormData.timestamp ? new Date(thirstFormData.timestamp).toISOString() : undefined;
+      await api.logThirst(selectedPetId, thirstFormData.level, thirstFormData.notes || undefined, loggedAt);
+      setShowThirstDialog(false);
+      setThirstFormData({ level: 'normal', notes: '', timestamp: '' });
+      const data = await api.getStoreDump(selectedPetId);
+      setStoreData(data);
+    } catch (err) {
+      console.error('Failed to log thirst:', err);
+      alert('Failed to log thirst: ' + (err as Error).message);
+    }
+  };
+
+  const submitLogAppetite = async () => {
+    if (!api || !selectedPetId) return;
+    try {
+      const loggedAt = appetiteFormData.timestamp ? new Date(appetiteFormData.timestamp).toISOString() : undefined;
+      await api.logAppetite(selectedPetId, appetiteFormData.level, appetiteFormData.notes || undefined, loggedAt);
+      setShowAppetiteDialog(false);
+      setAppetiteFormData({ level: 'normal', notes: '', timestamp: '' });
+      const data = await api.getStoreDump(selectedPetId);
+      setStoreData(data);
+    } catch (err) {
+      console.error('Failed to log appetite:', err);
+      alert('Failed to log appetite: ' + (err as Error).message);
+    }
+  };
+
+  const submitLogWellbeing = async () => {
+    if (!api || !selectedPetId) return;
+    try {
+      const loggedAt = wellbeingFormData.timestamp ? new Date(wellbeingFormData.timestamp).toISOString() : undefined;
+      const symptoms = wellbeingFormData.symptoms
+        ? wellbeingFormData.symptoms.split(',').map(s => s.trim()).filter(s => s.length > 0)
+        : [];
+      await api.logWellbeing(selectedPetId, wellbeingFormData.wellbeing_score, symptoms, wellbeingFormData.notes || undefined, loggedAt);
+      setShowWellbeingDialog(false);
+      setWellbeingFormData({ wellbeing_score: 'good', symptoms: '', notes: '', timestamp: '' });
+      const data = await api.getStoreDump(selectedPetId);
+      setStoreData(data);
+    } catch (err) {
+      console.error('Failed to log wellbeing:', err);
+      alert('Failed to log wellbeing: ' + (err as Error).message);
+    }
+  };
+
+  const submitLogWeight = async () => {
+    if (!api || !selectedPetId) return;
+    const weightKg = parseFloat(weightFormData.weight_kg);
+    if (isNaN(weightKg) || weightKg <= 0) {
+      alert('Please enter a valid weight');
+      return;
+    }
+    try {
+      const weightGrams = Math.round(weightKg * 1000);
+      const loggedAt = weightFormData.timestamp ? new Date(weightFormData.timestamp).toISOString() : undefined;
+      await api.logWeight(selectedPetId, weightGrams, weightFormData.notes || undefined, loggedAt);
+      setShowWeightDialog(false);
+      setWeightFormData({ weight_kg: '', notes: '', timestamp: '' });
+      const data = await api.getStoreDump(selectedPetId);
+      setStoreData(data);
+    } catch (err) {
+      console.error('Failed to log weight:', err);
+      alert('Failed to log weight: ' + (err as Error).message);
+    }
+  };
+
+  const submitLogVomit = async () => {
+    if (!api || !selectedPetId) return;
+    try {
+      const loggedAt = vomitFormData.timestamp ? new Date(vomitFormData.timestamp).toISOString() : undefined;
+      await api.logVomit(selectedPetId, vomitFormData.vomit_type, vomitFormData.notes || undefined, loggedAt);
+      setShowVomitDialog(false);
+      setVomitFormData({ vomit_type: 'other', notes: '', timestamp: '' });
+      const data = await api.getStoreDump(selectedPetId);
+      setStoreData(data);
+    } catch (err) {
+      console.error('Failed to log vomit:', err);
+      alert('Failed to log vomit: ' + (err as Error).message);
     }
   };
 
@@ -1125,9 +1267,14 @@ function App({ hass }: AppProps) {
       {currentView === 'health' && selectedPet && (
         <div style={{display: "flex", flexDirection: "column", gap: "24px"}}>
           {/* Wellbeing */}
-          {storeData.wellbeing && storeData.wellbeing.length > 0 && (
-            <div style={styles.card}>
-              <h3 style={styles.h3}>Wellbeing Assessments</h3>
+          <div style={styles.card}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+              <h3 style={{...styles.h3, margin: 0, border: 'none', paddingBottom: 0}}>Wellbeing Assessments</h3>
+              <button style={styles.button} onClick={() => { setWellbeingFormData({ wellbeing_score: 'good', symptoms: '', notes: '', timestamp: '' }); setShowWellbeingDialog(true); }}>
+                + Log Wellbeing
+              </button>
+            </div>
+            {storeData.wellbeing && storeData.wellbeing.length > 0 ? (
               <table style={styles.table}>
                 <thead>
                   <tr>
@@ -1148,13 +1295,20 @@ function App({ hass }: AppProps) {
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
+            ) : (
+              <p>No wellbeing assessments recorded yet.</p>
+            )}
+          </div>
 
           {/* Thirst Levels */}
-          {storeData.thirst_levels && storeData.thirst_levels.length > 0 && (
-            <div style={styles.card}>
-              <h3 style={styles.h3}>Thirst Levels</h3>
+          <div style={styles.card}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+              <h3 style={{...styles.h3, margin: 0, border: 'none', paddingBottom: 0}}>Thirst Levels</h3>
+              <button style={styles.button} onClick={() => { setThirstFormData({ level: 'normal', notes: '', timestamp: '' }); setShowThirstDialog(true); }}>
+                + Log Thirst
+              </button>
+            </div>
+            {storeData.thirst_levels && storeData.thirst_levels.length > 0 ? (
               <table style={styles.table}>
                 <thead>
                   <tr>
@@ -1173,13 +1327,20 @@ function App({ hass }: AppProps) {
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
+            ) : (
+              <p>No thirst levels recorded yet.</p>
+            )}
+          </div>
 
           {/* Appetite Levels */}
-          {storeData.appetite_levels && storeData.appetite_levels.length > 0 && (
-            <div style={styles.card}>
-              <h3 style={styles.h3}>Appetite Levels</h3>
+          <div style={styles.card}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+              <h3 style={{...styles.h3, margin: 0, border: 'none', paddingBottom: 0}}>Appetite Levels</h3>
+              <button style={styles.button} onClick={() => { setAppetiteFormData({ level: 'normal', notes: '', timestamp: '' }); setShowAppetiteDialog(true); }}>
+                + Log Appetite
+              </button>
+            </div>
+            {storeData.appetite_levels && storeData.appetite_levels.length > 0 ? (
               <table style={styles.table}>
                 <thead>
                   <tr>
@@ -1198,13 +1359,20 @@ function App({ hass }: AppProps) {
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
+            ) : (
+              <p>No appetite levels recorded yet.</p>
+            )}
+          </div>
 
           {/* Weight History */}
-          {storeData.weight && storeData.weight.length > 0 && (
-            <div style={styles.card}>
-              <h3 style={styles.h3}>Weight History</h3>
+          <div style={styles.card}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+              <h3 style={{...styles.h3, margin: 0, border: 'none', paddingBottom: 0}}>Weight History</h3>
+              <button style={styles.button} onClick={() => { setWeightFormData({ weight_kg: '', notes: '', timestamp: '' }); setShowWeightDialog(true); }}>
+                + Log Weight
+              </button>
+            </div>
+            {storeData.weight && storeData.weight.length > 0 ? (
               <table style={styles.table}>
                 <thead>
                   <tr>
@@ -1223,13 +1391,20 @@ function App({ hass }: AppProps) {
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
+            ) : (
+              <p>No weight records yet.</p>
+            )}
+          </div>
 
           {/* Vomit Records */}
-          {storeData.vomit && storeData.vomit.length > 0 && (
-            <div style={styles.card}>
-              <h3 style={styles.h3}>Vomit Records</h3>
+          <div style={styles.card}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+              <h3 style={{...styles.h3, margin: 0, border: 'none', paddingBottom: 0}}>Vomit Records</h3>
+              <button style={styles.button} onClick={() => { setVomitFormData({ vomit_type: 'other', notes: '', timestamp: '' }); setShowVomitDialog(true); }}>
+                + Log Vomit
+              </button>
+            </div>
+            {storeData.vomit && storeData.vomit.length > 0 ? (
               <table style={styles.table}>
                 <thead>
                   <tr>
@@ -1248,25 +1423,24 @@ function App({ hass }: AppProps) {
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
-
-          {!storeData.wellbeing?.length && !storeData.thirst_levels?.length &&
-           !storeData.appetite_levels?.length && !storeData.weight?.length &&
-           !storeData.vomit?.length && (
-            <div style={styles.card}>
-              <p>No health data recorded yet.</p>
-            </div>
-          )}
+            ) : (
+              <p>No vomit records yet.</p>
+            )}
+          </div>
         </div>
       )}
 
       {currentView === 'nutrition' && selectedPet && (
         <div style={{display: "flex", flexDirection: "column", gap: "24px"}}>
           {/* Meals */}
-          {storeData.meals && storeData.meals.length > 0 && (
-            <div style={styles.card}>
-              <h3 style={styles.h3}>Meals</h3>
+          <div style={styles.card}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+              <h3 style={{...styles.h3, margin: 0, border: 'none', paddingBottom: 0}}>Meals</h3>
+              <button style={styles.button} onClick={() => { setMealFormData({ amount: 'normal', food_type: '', notes: '', timestamp: '' }); setShowMealDialog(true); }}>
+                + Log Meal
+              </button>
+            </div>
+            {storeData.meals && storeData.meals.length > 0 ? (
               <table style={styles.table}>
                 <thead>
                   <tr>
@@ -1287,13 +1461,20 @@ function App({ hass }: AppProps) {
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
+            ) : (
+              <p>No meals recorded yet.</p>
+            )}
+          </div>
 
           {/* Drinks */}
-          {storeData.drinks && storeData.drinks.length > 0 && (
-            <div style={styles.card}>
-              <h3 style={styles.h3}>Drinks</h3>
+          <div style={styles.card}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+              <h3 style={{...styles.h3, margin: 0, border: 'none', paddingBottom: 0}}>Drinks</h3>
+              <button style={styles.button} onClick={() => { setDrinkFormData({ amount: 'normal', notes: '', timestamp: '' }); setShowDrinkDialog(true); }}>
+                + Log Drink
+              </button>
+            </div>
+            {storeData.drinks && storeData.drinks.length > 0 ? (
               <table style={styles.table}>
                 <thead>
                   <tr>
@@ -1312,14 +1493,10 @@ function App({ hass }: AppProps) {
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
-
-          {!storeData.meals?.length && !storeData.drinks?.length && (
-            <div style={styles.card}>
-              <p>No nutrition data recorded yet.</p>
-            </div>
-          )}
+            ) : (
+              <p>No drinks recorded yet.</p>
+            )}
+          </div>
         </div>
       )}
 
@@ -1860,6 +2037,273 @@ function App({ hass }: AppProps) {
         </div>
       )}
       </div>
+
+      {/* Log Drink Dialog */}
+      {showDrinkDialog && (
+        <div style={styles.dialogOverlay} onClick={() => setShowDrinkDialog(false)}>
+          <div
+            style={styles.dialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="log-drink-dialog-title"
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setShowDrinkDialog(false);
+              }
+            }}
+          >
+            <h2 id="log-drink-dialog-title" style={styles.h2}>Log Drink</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Amount:
+                <select autoFocus value={drinkFormData.amount} onChange={(e) => setDrinkFormData({...drinkFormData, amount: e.target.value})} style={styles.input}>
+                  <option value="small">Small</option>
+                  <option value="normal">Normal</option>
+                  <option value="large">Large</option>
+                </select>
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Notes:
+                <textarea value={drinkFormData.notes} onChange={(e) => setDrinkFormData({...drinkFormData, notes: e.target.value})} rows={3} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Time (leave empty for now):
+                <input type="datetime-local" value={drinkFormData.timestamp} onChange={(e) => setDrinkFormData({...drinkFormData, timestamp: e.target.value})} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.dialogButtons}>
+              <button style={styles.actionButton} onClick={submitLogDrink}>Submit</button>
+              <button style={styles.actionButton} onClick={() => setShowDrinkDialog(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log Meal Dialog */}
+      {showMealDialog && (
+        <div style={styles.dialogOverlay} onClick={() => setShowMealDialog(false)}>
+          <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.h2}>Log Meal</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Amount:
+                <select value={mealFormData.amount} onChange={(e) => setMealFormData({...mealFormData, amount: e.target.value})} style={styles.input}>
+                  <option value="small">Small</option>
+                  <option value="normal">Normal</option>
+                  <option value="large">Large</option>
+                </select>
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Food Type:
+                <input type="text" value={mealFormData.food_type} onChange={(e) => setMealFormData({...mealFormData, food_type: e.target.value})} style={styles.input} placeholder="e.g. dry food, wet food..." />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Notes:
+                <textarea value={mealFormData.notes} onChange={(e) => setMealFormData({...mealFormData, notes: e.target.value})} rows={3} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Time (leave empty for now):
+                <input type="datetime-local" value={mealFormData.timestamp} onChange={(e) => setMealFormData({...mealFormData, timestamp: e.target.value})} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.dialogButtons}>
+              <button style={styles.actionButton} onClick={submitLogMeal}>Submit</button>
+              <button style={styles.actionButton} onClick={() => setShowMealDialog(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log Thirst Dialog */}
+      {showThirstDialog && (
+        <div style={styles.dialogOverlay} onClick={() => setShowThirstDialog(false)}>
+          <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.h2}>Log Thirst Level</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Level:
+                <select value={thirstFormData.level} onChange={(e) => setThirstFormData({...thirstFormData, level: e.target.value})} style={styles.input}>
+                  <option value="normal">Normal</option>
+                  <option value="lessened">Lessened</option>
+                  <option value="increased">Increased</option>
+                </select>
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Notes:
+                <textarea value={thirstFormData.notes} onChange={(e) => setThirstFormData({...thirstFormData, notes: e.target.value})} rows={3} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Time (leave empty for now):
+                <input type="datetime-local" value={thirstFormData.timestamp} onChange={(e) => setThirstFormData({...thirstFormData, timestamp: e.target.value})} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.dialogButtons}>
+              <button style={styles.actionButton} onClick={submitLogThirst}>Submit</button>
+              <button style={styles.actionButton} onClick={() => setShowThirstDialog(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log Appetite Dialog */}
+      {showAppetiteDialog && (
+        <div style={styles.dialogOverlay} onClick={() => setShowAppetiteDialog(false)}>
+          <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.h2}>Log Appetite Level</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Level:
+                <select value={appetiteFormData.level} onChange={(e) => setAppetiteFormData({...appetiteFormData, level: e.target.value})} style={styles.input}>
+                  <option value="normal">Normal</option>
+                  <option value="lessened">Lessened</option>
+                  <option value="increased">Increased</option>
+                </select>
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Notes:
+                <textarea value={appetiteFormData.notes} onChange={(e) => setAppetiteFormData({...appetiteFormData, notes: e.target.value})} rows={3} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Time (leave empty for now):
+                <input type="datetime-local" value={appetiteFormData.timestamp} onChange={(e) => setAppetiteFormData({...appetiteFormData, timestamp: e.target.value})} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.dialogButtons}>
+              <button style={styles.actionButton} onClick={submitLogAppetite}>Submit</button>
+              <button style={styles.actionButton} onClick={() => setShowAppetiteDialog(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log Wellbeing Dialog */}
+      {showWellbeingDialog && (
+        <div style={styles.dialogOverlay} onClick={() => setShowWellbeingDialog(false)}>
+          <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.h2}>Log Wellbeing</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Score:
+                <select value={wellbeingFormData.wellbeing_score} onChange={(e) => setWellbeingFormData({...wellbeingFormData, wellbeing_score: e.target.value})} style={styles.input}>
+                  <option value="poor">Poor</option>
+                  <option value="fair">Fair</option>
+                  <option value="good">Good</option>
+                  <option value="excellent">Excellent</option>
+                </select>
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Symptoms (comma-separated):
+                <input type="text" value={wellbeingFormData.symptoms} onChange={(e) => setWellbeingFormData({...wellbeingFormData, symptoms: e.target.value})} style={styles.input} placeholder="e.g. lethargy, vomiting..." />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Notes:
+                <textarea value={wellbeingFormData.notes} onChange={(e) => setWellbeingFormData({...wellbeingFormData, notes: e.target.value})} rows={3} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Time (leave empty for now):
+                <input type="datetime-local" value={wellbeingFormData.timestamp} onChange={(e) => setWellbeingFormData({...wellbeingFormData, timestamp: e.target.value})} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.dialogButtons}>
+              <button style={styles.actionButton} onClick={submitLogWellbeing}>Submit</button>
+              <button style={styles.actionButton} onClick={() => setShowWellbeingDialog(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log Weight Dialog */}
+      {showWeightDialog && (
+        <div style={styles.dialogOverlay} onClick={() => setShowWeightDialog(false)}>
+          <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.h2}>Log Weight</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Weight (kg):
+                <input type="number" step="0.01" min="0.1" value={weightFormData.weight_kg} onChange={(e) => setWeightFormData({...weightFormData, weight_kg: e.target.value})} style={styles.input} placeholder="e.g. 4.5" />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Notes:
+                <textarea value={weightFormData.notes} onChange={(e) => setWeightFormData({...weightFormData, notes: e.target.value})} rows={3} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Time (leave empty for now):
+                <input type="datetime-local" value={weightFormData.timestamp} onChange={(e) => setWeightFormData({...weightFormData, timestamp: e.target.value})} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.dialogButtons}>
+              <button style={styles.actionButton} onClick={submitLogWeight}>Submit</button>
+              <button style={styles.actionButton} onClick={() => setShowWeightDialog(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log Vomit Dialog */}
+      {showVomitDialog && (
+        <div style={styles.dialogOverlay} onClick={() => setShowVomitDialog(false)}>
+          <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.h2}>Log Vomit</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Type:
+                <select value={vomitFormData.vomit_type} onChange={(e) => setVomitFormData({...vomitFormData, vomit_type: e.target.value})} style={styles.input}>
+                  <option value="hairball">Hairball</option>
+                  <option value="food">Food</option>
+                  <option value="bile">Bile</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Notes:
+                <textarea value={vomitFormData.notes} onChange={(e) => setVomitFormData({...vomitFormData, notes: e.target.value})} rows={3} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Time (leave empty for now):
+                <input type="datetime-local" value={vomitFormData.timestamp} onChange={(e) => setVomitFormData({...vomitFormData, timestamp: e.target.value})} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.dialogButtons}>
+              <button style={styles.actionButton} onClick={submitLogVomit}>Submit</button>
+              <button style={styles.actionButton} onClick={() => setShowVomitDialog(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
