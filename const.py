@@ -34,6 +34,12 @@ CONF_MEDICATION_NOTES = "notes"
 # Generic log category config keys
 CONF_CATEGORY_ID = "category_id"
 CONF_CATEGORY_NAME = "category_name"
+DEFAULT_GENERIC_LOG_CATEGORIES = [
+    {
+        CONF_CATEGORY_ID: "tick_prevention",
+        CONF_CATEGORY_NAME: "Tick prevention",
+    }
+]
 
 # Storage
 STORAGE_VERSION = 1

@@ -55,6 +55,7 @@ from .const import (
     CONF_PET_ID,
     CONF_PET_NAME,
     CONF_PET_TYPE,
+    DEFAULT_GENERIC_LOG_CATEGORIES,
     DOMAIN,
     EVENT_PET_HEALTH_DATA_UPDATED,
     SERVICE_AMEND_VISIT,
@@ -1221,6 +1222,13 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             for cat in configured_categories 
             if cat.get(CONF_CATEGORY_NAME)
         }
+        valid_categories.update(
+            {
+                cat.get(CONF_CATEGORY_NAME)
+                for cat in DEFAULT_GENERIC_LOG_CATEGORIES
+                if cat.get(CONF_CATEGORY_NAME)
+            }
+        )
         
         if category not in valid_categories:
             raise HomeAssistantError(
