@@ -511,6 +511,42 @@ log_weight:
         text:
           multiline: true
 
+log_vet_visit:
+  name: Log vet visit
+  description: Record a vet visit with what was done, with optional weight logging
+  fields:
+    config_entry_id:
+      name: Pet
+      description: The pet that had the vet visit
+      required: true
+      selector:
+        config_entry:
+          integration: pet_health
+    notes:
+      name: What was done
+      description: Details about what was done during the vet visit
+      required: true
+      selector:
+        text:
+          multiline: true
+    weight_grams:
+      name: Weight (grams)
+      description: Optional weight measured at the vet. When provided, this is also logged through log_weight.
+      required: false
+      selector:
+        number:
+          min: 100
+          max: 50000
+          step: 1
+          unit_of_measurement: g
+          mode: box
+    logged_at:
+      name: Logged at
+      description: When the vet visit occurred. If not specified, uses current time.
+      required: false
+      selector:
+        datetime:
+
 log_vomit:
   name: Log vomiting
   description: Record a vomiting incident for a pet

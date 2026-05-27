@@ -71,6 +71,7 @@ from .const import (
     SERVICE_LOG_MEAL,
     SERVICE_LOG_MEDICATION,
     SERVICE_LOG_THIRST,
+    SERVICE_LOG_VET_VISIT,
     SERVICE_LOG_VOMIT,
     SERVICE_LOG_WEIGHT,
     SERVICE_LOG_WELLBEING,
@@ -259,6 +260,18 @@ SERVICE_LOG_WEIGHT_SCHEMA = vol.Schema(
         ),
         vol.Optional(ATTR_LOGGED_AT): cv.datetime,
         vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
+# Schema for log_vet_visit service
+SERVICE_LOG_VET_VISIT_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Required(ATTR_NOTES): cv.string,
+        vol.Optional(ATTR_WEIGHT_GRAMS): vol.All(
+            vol.Coerce(int), vol.Range(min=100, max=50000)
+        ),
+        vol.Optional(ATTR_LOGGED_AT): cv.datetime,
     }
 )
 
@@ -1061,6 +1074,78 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
         return response
 
+    async def handle_log_vet_visit(call: ServiceCall) -> ServiceResponse:
+        """Handle the log_vet_visit service call."""
+        entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
+        entry = hass.config_entries.async_get_entry(entry_id)
+
+        if not entry:
+            raise HomeAssistantError(f"Config entry {entry_id} not found")
+
+        if entry.domain != DOMAIN:
+            raise HomeAssistantError(
+                f"Config entry {entry_id} is not a pet_health entry"
+            )
+
+        pet_data: PetData = entry.runtime_data
+
+        logged_at = call.data.get(ATTR_LOGGED_AT)
+        if logged_at is None:
+            logged_at = dt_util.now()
+        else:
+            logged_at = dt_util.as_utc(logged_at)
+
+        vet_visit_log = GenericLog(
+            timestamp=logged_at,
+            pet_id=pet_data.pet_id,
+            category="vet_visit",
+            notes=call.data[ATTR_NOTES],
+        )
+
+        await store.async_save_generic_log(vet_visit_log)
+        _LOGGER.info(
+            "Logged vet visit for %s at %s",
+            pet_data.name,
+            vet_visit_log.timestamp,
+        )
+
+        response = {
+            "log_id": vet_visit_log.log_id,
+            "timestamp": vet_visit_log.timestamp.isoformat(),
+            "pet_name": pet_data.name,
+            "category": vet_visit_log.category,
+        }
+
+        if ATTR_WEIGHT_GRAMS in call.data:
+            weight_data = {
+                ATTR_CONFIG_ENTRY_ID: entry_id,
+                ATTR_WEIGHT_GRAMS: call.data[ATTR_WEIGHT_GRAMS],
+                ATTR_LOGGED_AT: logged_at,
+            }
+            try:
+                weight_response = await hass.services.async_call(
+                    DOMAIN,
+                    SERVICE_LOG_WEIGHT,
+                    weight_data,
+                    blocking=True,
+                    return_response=True,
+                )
+                response["weight"] = weight_response
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.error(
+                    "Vet visit logged but weight recording failed for %s: %s",
+                    pet_data.name,
+                    err,
+                )
+                response["weight_error"] = str(err)
+
+        hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+            "pet_id": pet_data.pet_id,
+            "data_type": "generic_logs",
+        })
+
+        return response
+
     async def handle_log_vomit(call: ServiceCall) -> ServiceResponse:
         """Handle the log_vomit service call."""
         entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
@@ -1438,6 +1523,14 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         SERVICE_LOG_WEIGHT,
         handle_log_weight,
         schema=SERVICE_LOG_WEIGHT_SCHEMA,
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOG_VET_VISIT,
+        handle_log_vet_visit,
+        schema=SERVICE_LOG_VET_VISIT_SCHEMA,
         supports_response=True,
     )
 
