@@ -25,15 +25,19 @@ from .const import (
     ATTR_DOSAGE,
     ATTR_FOOD_TYPE,
     ATTR_GIVEN_AT,
+    ATTR_VALUE,
     ATTR_LEVEL,
     ATTR_LOGGED_AT,
+    ATTR_MEASUREMENT_LOCATION,
     ATTR_MEDICATION_ID,
     ATTR_MEDICATION_NAME,
+    ATTR_MONITOR_TYPE,
     ATTR_NOTES,
     ATTR_POOP_COLOR,
     ATTR_POOP_CONSISTENCIES,
     ATTR_REMOVE_UNKNOWN_VISITS,
     ATTR_REASON,
+    ATTR_SAMPLE_TYPE,
     ATTR_SYMPTOMS,
     ATTR_UNIT,
     ATTR_URINE_AMOUNT,
@@ -59,8 +63,11 @@ from .const import (
     SERVICE_DELETE_VISIT,
     SERVICE_LOG_APPETITE,
     SERVICE_LOG_BATHROOM_VISIT,
+    SERVICE_LOG_BLOOD_GLUCOSE,
     SERVICE_LOG_DRINK,
     SERVICE_LOG_GENERIC,
+    SERVICE_LOG_GLYCATED_HEMOGLOBIN,
+    SERVICE_LOG_KETONES,
     SERVICE_LOG_MEAL,
     SERVICE_LOG_MEDICATION,
     SERVICE_LOG_THIRST,
@@ -70,7 +77,10 @@ from .const import (
     SERVICE_REASSIGN_VISIT,
     UNKNOWN_ENTRY_ID,
     ConsumptionAmount,
+    GlucoseMonitorType,
+    KetoneSampleType,
     LevelState,
+    MeasurementLocation,
     PetType,
     PoopColor,
     PoopConsistency,
@@ -81,8 +91,11 @@ from .const import (
 from .models import (
     AppetiteLevelRecord,
     BathroomVisit,
+    BloodGlucoseRecord,
     DrinkRecord,
     GenericLog,
+    GlycatedHemoglobinRecord,
+    KetoneRecord,
     MealRecord,
     MedicationRecord,
     PetData,
@@ -268,6 +281,57 @@ SERVICE_LOG_GENERIC_SCHEMA = vol.Schema(
         vol.Required(ATTR_CATEGORY): cv.string,
         vol.Required(ATTR_NOTES): cv.string,
         vol.Optional(ATTR_LOGGED_AT): cv.datetime,
+    }
+)
+
+# Schema for log_blood_glucose service
+SERVICE_LOG_BLOOD_GLUCOSE_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Required(ATTR_VALUE): vol.All(
+            vol.Coerce(float), vol.Range(min=0.1, max=100.0)
+        ),
+        vol.Optional(ATTR_MONITOR_TYPE, default="pet_monitor"): vol.In(
+            [m.value for m in GlucoseMonitorType]
+        ),
+        vol.Optional(ATTR_MEASUREMENT_LOCATION, default="home"): vol.In(
+            [loc.value for loc in MeasurementLocation]
+        ),
+        vol.Optional(ATTR_LOGGED_AT): cv.datetime,
+        vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
+# Schema for log_glycated_hemoglobin service
+SERVICE_LOG_GLYCATED_HEMOGLOBIN_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Required(ATTR_VALUE): vol.All(
+            vol.Coerce(float), vol.Range(min=0.1, max=30.0)
+        ),
+        vol.Optional(ATTR_MEASUREMENT_LOCATION, default="vet"): vol.In(
+            [loc.value for loc in MeasurementLocation]
+        ),
+        vol.Optional(ATTR_LOGGED_AT): cv.datetime,
+        vol.Optional(ATTR_NOTES): cv.string,
+    }
+)
+
+# Schema for log_ketones service
+SERVICE_LOG_KETONES_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Required(ATTR_VALUE): vol.All(
+            vol.Coerce(float), vol.Range(min=0.0, max=100.0)
+        ),
+        vol.Optional(ATTR_SAMPLE_TYPE, default="urine"): vol.In(
+            [s.value for s in KetoneSampleType]
+        ),
+        vol.Optional(ATTR_MEASUREMENT_LOCATION, default="home"): vol.In(
+            [loc.value for loc in MeasurementLocation]
+        ),
+        vol.Optional(ATTR_LOGGED_AT): cv.datetime,
+        vol.Optional(ATTR_NOTES): cv.string,
     }
 )
 
@@ -1116,6 +1180,162 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             "category": log.category,
         }
 
+    async def handle_log_blood_glucose(call: ServiceCall) -> ServiceResponse:
+        """Handle the log_blood_glucose service call."""
+        entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
+        entry = hass.config_entries.async_get_entry(entry_id)
+
+        if not entry:
+            raise HomeAssistantError(f"Config entry {entry_id} not found")
+
+        if entry.domain != DOMAIN:
+            raise HomeAssistantError(
+                f"Config entry {entry_id} is not a pet_health entry"
+            )
+
+        pet_data: PetData = entry.runtime_data
+
+        logged_at = call.data.get(ATTR_LOGGED_AT)
+        if logged_at is None:
+            logged_at = dt_util.now()
+        else:
+            logged_at = dt_util.as_utc(logged_at)
+
+        record = BloodGlucoseRecord(
+            timestamp=logged_at,
+            pet_id=pet_data.pet_id,
+            value=call.data[ATTR_VALUE],
+            monitor_type=GlucoseMonitorType(
+                call.data.get(ATTR_MONITOR_TYPE, "pet_monitor")
+            ),
+            measurement_location=MeasurementLocation(
+                call.data.get(ATTR_MEASUREMENT_LOCATION, "home")
+            ),
+            notes=call.data.get(ATTR_NOTES),
+        )
+
+        await store.async_save_blood_glucose(record)
+        _LOGGER.info(
+            "Logged blood glucose (%.2f mmol/L) for %s at %s",
+            record.value,
+            pet_data.name,
+            record.timestamp,
+        )
+
+        hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+            "pet_id": pet_data.pet_id,
+            "data_type": "blood_glucose",
+        })
+
+        return {
+            "timestamp": record.timestamp.isoformat(),
+            "pet_name": pet_data.name,
+            "value": record.value,
+        }
+
+    async def handle_log_glycated_hemoglobin(call: ServiceCall) -> ServiceResponse:
+        """Handle the log_glycated_hemoglobin service call."""
+        entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
+        entry = hass.config_entries.async_get_entry(entry_id)
+
+        if not entry:
+            raise HomeAssistantError(f"Config entry {entry_id} not found")
+
+        if entry.domain != DOMAIN:
+            raise HomeAssistantError(
+                f"Config entry {entry_id} is not a pet_health entry"
+            )
+
+        pet_data: PetData = entry.runtime_data
+
+        logged_at = call.data.get(ATTR_LOGGED_AT)
+        if logged_at is None:
+            logged_at = dt_util.now()
+        else:
+            logged_at = dt_util.as_utc(logged_at)
+
+        record = GlycatedHemoglobinRecord(
+            timestamp=logged_at,
+            pet_id=pet_data.pet_id,
+            value=call.data[ATTR_VALUE],
+            measurement_location=MeasurementLocation(
+                call.data.get(ATTR_MEASUREMENT_LOCATION, "vet")
+            ),
+            notes=call.data.get(ATTR_NOTES),
+        )
+
+        await store.async_save_glycated_hemoglobin(record)
+        _LOGGER.info(
+            "Logged glycated hemoglobin (%.2f%%) for %s at %s",
+            record.value,
+            pet_data.name,
+            record.timestamp,
+        )
+
+        hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+            "pet_id": pet_data.pet_id,
+            "data_type": "glycated_hemoglobin",
+        })
+
+        return {
+            "timestamp": record.timestamp.isoformat(),
+            "pet_name": pet_data.name,
+            "value": record.value,
+        }
+
+    async def handle_log_ketones(call: ServiceCall) -> ServiceResponse:
+        """Handle the log_ketones service call."""
+        entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
+        entry = hass.config_entries.async_get_entry(entry_id)
+
+        if not entry:
+            raise HomeAssistantError(f"Config entry {entry_id} not found")
+
+        if entry.domain != DOMAIN:
+            raise HomeAssistantError(
+                f"Config entry {entry_id} is not a pet_health entry"
+            )
+
+        pet_data: PetData = entry.runtime_data
+
+        logged_at = call.data.get(ATTR_LOGGED_AT)
+        if logged_at is None:
+            logged_at = dt_util.now()
+        else:
+            logged_at = dt_util.as_utc(logged_at)
+
+        record = KetoneRecord(
+            timestamp=logged_at,
+            pet_id=pet_data.pet_id,
+            value=call.data[ATTR_VALUE],
+            sample_type=KetoneSampleType(
+                call.data.get(ATTR_SAMPLE_TYPE, "urine")
+            ),
+            measurement_location=MeasurementLocation(
+                call.data.get(ATTR_MEASUREMENT_LOCATION, "home")
+            ),
+            notes=call.data.get(ATTR_NOTES),
+        )
+
+        await store.async_save_ketones(record)
+        _LOGGER.info(
+            "Logged ketones (%.2f mmol/L) for %s at %s",
+            record.value,
+            pet_data.name,
+            record.timestamp,
+        )
+
+        hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
+            "pet_id": pet_data.pet_id,
+            "data_type": "ketones",
+        })
+
+        return {
+            "timestamp": record.timestamp.isoformat(),
+            "pet_name": pet_data.name,
+            "value": record.value,
+        }
+
     # Register services
     hass.services.async_register(
         DOMAIN,
@@ -1234,6 +1454,30 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         SERVICE_LOG_GENERIC,
         handle_log_generic,
         schema=SERVICE_LOG_GENERIC_SCHEMA,
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOG_BLOOD_GLUCOSE,
+        handle_log_blood_glucose,
+        schema=SERVICE_LOG_BLOOD_GLUCOSE_SCHEMA,
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOG_GLYCATED_HEMOGLOBIN,
+        handle_log_glycated_hemoglobin,
+        schema=SERVICE_LOG_GLYCATED_HEMOGLOBIN_SCHEMA,
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOG_KETONES,
+        handle_log_ketones,
+        schema=SERVICE_LOG_KETONES_SCHEMA,
         supports_response=True,
     )
 

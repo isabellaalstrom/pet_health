@@ -222,6 +222,61 @@ export class PetHealthAPI {
     await this.hass.callService('pet_health', 'log_vomit', data);
   }
 
+  async logBloodGlucose(
+    entryId: string,
+    value: number,
+    monitorType: string,
+    measurementLocation: string,
+    notes?: string,
+    loggedAt?: string
+  ): Promise<void> {
+    const data: Record<string, unknown> = {
+      config_entry_id: entryId,
+      value,
+      monitor_type: monitorType,
+      measurement_location: measurementLocation,
+    };
+    if (notes) data.notes = notes;
+    if (loggedAt) data.logged_at = loggedAt;
+    await this.hass.callService('pet_health', 'log_blood_glucose', data);
+  }
+
+  async logGlycatedHemoglobin(
+    entryId: string,
+    value: number,
+    measurementLocation: string,
+    notes?: string,
+    loggedAt?: string
+  ): Promise<void> {
+    const data: Record<string, unknown> = {
+      config_entry_id: entryId,
+      value,
+      measurement_location: measurementLocation,
+    };
+    if (notes) data.notes = notes;
+    if (loggedAt) data.logged_at = loggedAt;
+    await this.hass.callService('pet_health', 'log_glycated_hemoglobin', data);
+  }
+
+  async logKetones(
+    entryId: string,
+    value: number,
+    sampleType: string,
+    measurementLocation: string,
+    notes?: string,
+    loggedAt?: string
+  ): Promise<void> {
+    const data: Record<string, unknown> = {
+      config_entry_id: entryId,
+      value,
+      sample_type: sampleType,
+      measurement_location: measurementLocation,
+    };
+    if (notes) data.notes = notes;
+    if (loggedAt) data.logged_at = loggedAt;
+    await this.hass.callService('pet_health', 'log_ketones', data);
+  }
+
   subscribeToDataUpdates(callback: () => void): Promise<() => void> {
     return this.hass.connection.subscribeEvents(callback, 'pet_health_data_updated');
   }

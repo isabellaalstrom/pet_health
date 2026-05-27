@@ -9,8 +9,11 @@ from homeassistant.helpers.storage import Store
 
 from .const import (
     STORAGE_KEY_APPETITE_LEVELS,
+    STORAGE_KEY_BLOOD_GLUCOSE,
     STORAGE_KEY_DRINKS,
     STORAGE_KEY_GENERIC_LOGS,
+    STORAGE_KEY_GLYCATED_HEMOGLOBIN,
+    STORAGE_KEY_KETONES,
     STORAGE_KEY_MEALS,
     STORAGE_KEY_MEDICATIONS,
     STORAGE_KEY_THIRST_LEVELS,
@@ -23,8 +26,11 @@ from .const import (
 from .models import (
     AppetiteLevelRecord,
     BathroomVisit,
+    BloodGlucoseRecord,
     DrinkRecord,
     GenericLog,
+    GlycatedHemoglobinRecord,
+    KetoneRecord,
     MealRecord,
     MedicationRecord,
     ThirstLevelRecord,
@@ -70,6 +76,15 @@ class PetHealthStore:
         self._generic_logs_store = Store[dict[str, list[dict]]](
             hass, STORAGE_VERSION, STORAGE_KEY_GENERIC_LOGS
         )
+        self._blood_glucose_store = Store[dict[str, list[dict]]](
+            hass, STORAGE_VERSION, STORAGE_KEY_BLOOD_GLUCOSE
+        )
+        self._glycated_hemoglobin_store = Store[dict[str, list[dict]]](
+            hass, STORAGE_VERSION, STORAGE_KEY_GLYCATED_HEMOGLOBIN
+        )
+        self._ketones_store = Store[dict[str, list[dict]]](
+            hass, STORAGE_VERSION, STORAGE_KEY_KETONES
+        )
         self._visits_data: dict[str, list[BathroomVisit]] = {}
         self._medications_data: dict[str, list[MedicationRecord]] = {}
         self._drinks_data: dict[str, list[DrinkRecord]] = {}
@@ -80,6 +95,9 @@ class PetHealthStore:
         self._weight_data: dict[str, list[WeightRecord]] = {}
         self._vomit_data: dict[str, list[VomitRecord]] = {}
         self._generic_logs_data: dict[str, list[GenericLog]] = {}
+        self._blood_glucose_data: dict[str, list[BloodGlucoseRecord]] = {}
+        self._glycated_hemoglobin_data: dict[str, list[GlycatedHemoglobinRecord]] = {}
+        self._ketones_data: dict[str, list[KetoneRecord]] = {}
         self._callbacks: dict[str, list[Callable]] = {}
 
     async def async_load(self) -> None:
@@ -164,6 +182,30 @@ class PetHealthStore:
             for pet_id, logs in stored_generic_logs.items():
                 self._generic_logs_data[pet_id] = [
                     GenericLog.from_dict(log) for log in logs
+                ]
+
+        # Load blood glucose records
+        stored_blood_glucose = await self._blood_glucose_store.async_load()
+        if stored_blood_glucose:
+            for pet_id, records in stored_blood_glucose.items():
+                self._blood_glucose_data[pet_id] = [
+                    BloodGlucoseRecord.from_dict(record) for record in records
+                ]
+
+        # Load glycated hemoglobin records
+        stored_glycated_hemoglobin = await self._glycated_hemoglobin_store.async_load()
+        if stored_glycated_hemoglobin:
+            for pet_id, records in stored_glycated_hemoglobin.items():
+                self._glycated_hemoglobin_data[pet_id] = [
+                    GlycatedHemoglobinRecord.from_dict(record) for record in records
+                ]
+
+        # Load ketone records
+        stored_ketones = await self._ketones_store.async_load()
+        if stored_ketones:
+            for pet_id, records in stored_ketones.items():
+                self._ketones_data[pet_id] = [
+                    KetoneRecord.from_dict(record) for record in records
                 ]
 
     async def async_save_visit(self, visit: BathroomVisit) -> None:
@@ -429,6 +471,61 @@ class PetHealthStore:
     def get_generic_logs(self, pet_id: str) -> list[GenericLog]:
         """Get all generic logs for a pet."""
         return self._generic_logs_data.get(pet_id, [])
+
+    async def async_save_blood_glucose(self, record: BloodGlucoseRecord) -> None:
+        """Save a blood glucose record."""
+        if record.pet_id not in self._blood_glucose_data:
+            self._blood_glucose_data[record.pet_id] = []
+        self._blood_glucose_data[record.pet_id].append(record)
+
+        store_data = {
+            pet_id: [r.to_dict() for r in records]
+            for pet_id, records in self._blood_glucose_data.items()
+        }
+        await self._blood_glucose_store.async_save(store_data)
+        self._notify_callbacks(record.pet_id)
+
+    async def async_save_glycated_hemoglobin(
+        self, record: GlycatedHemoglobinRecord
+    ) -> None:
+        """Save a glycated hemoglobin record."""
+        if record.pet_id not in self._glycated_hemoglobin_data:
+            self._glycated_hemoglobin_data[record.pet_id] = []
+        self._glycated_hemoglobin_data[record.pet_id].append(record)
+
+        store_data = {
+            pet_id: [r.to_dict() for r in records]
+            for pet_id, records in self._glycated_hemoglobin_data.items()
+        }
+        await self._glycated_hemoglobin_store.async_save(store_data)
+        self._notify_callbacks(record.pet_id)
+
+    async def async_save_ketones(self, record: KetoneRecord) -> None:
+        """Save a ketone record."""
+        if record.pet_id not in self._ketones_data:
+            self._ketones_data[record.pet_id] = []
+        self._ketones_data[record.pet_id].append(record)
+
+        store_data = {
+            pet_id: [r.to_dict() for r in records]
+            for pet_id, records in self._ketones_data.items()
+        }
+        await self._ketones_store.async_save(store_data)
+        self._notify_callbacks(record.pet_id)
+
+    def get_blood_glucose_records(self, pet_id: str) -> list[BloodGlucoseRecord]:
+        """Get all blood glucose records for a pet."""
+        return self._blood_glucose_data.get(pet_id, [])
+
+    def get_glycated_hemoglobin_records(
+        self, pet_id: str
+    ) -> list[GlycatedHemoglobinRecord]:
+        """Get all glycated hemoglobin records for a pet."""
+        return self._glycated_hemoglobin_data.get(pet_id, [])
+
+    def get_ketone_records(self, pet_id: str) -> list[KetoneRecord]:
+        """Get all ketone records for a pet."""
+        return self._ketones_data.get(pet_id, [])
 
     def register_update_callback(self, pet_id: str, callback: Callable) -> None:
         """Register a callback for when data is updated."""

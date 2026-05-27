@@ -47,6 +47,9 @@ STORAGE_KEY_WELLBEING = "pet_health_wellbeing"
 STORAGE_KEY_WEIGHT = "pet_health_weight"
 STORAGE_KEY_VOMIT = "pet_health_vomit"
 STORAGE_KEY_GENERIC_LOGS = "pet_health_generic_logs"
+STORAGE_KEY_BLOOD_GLUCOSE = "pet_health_blood_glucose"
+STORAGE_KEY_GLYCATED_HEMOGLOBIN = "pet_health_glycated_hemoglobin"
+STORAGE_KEY_KETONES = "pet_health_ketones"
 
 # Service names
 SERVICE_LOG_BATHROOM_VISIT = "log_bathroom_visit"
@@ -64,6 +67,9 @@ SERVICE_LOG_WELLBEING = "log_wellbeing"
 SERVICE_LOG_WEIGHT = "log_weight"
 SERVICE_LOG_VOMIT = "log_vomit"
 SERVICE_LOG_GENERIC = "log_generic"
+SERVICE_LOG_BLOOD_GLUCOSE = "log_blood_glucose"
+SERVICE_LOG_GLYCATED_HEMOGLOBIN = "log_glycated_hemoglobin"
+SERVICE_LOG_KETONES = "log_ketones"
 
 # Service attributes
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
@@ -100,6 +106,12 @@ ATTR_VOMIT_TYPE = "vomit_type"
 # Generic log attributes
 ATTR_CATEGORY = "category"
 ATTR_CATEGORY_ID = "category_id"
+
+# Blood glucose / ketone attributes
+ATTR_VALUE = "value"
+ATTR_MONITOR_TYPE = "monitor_type"
+ATTR_SAMPLE_TYPE = "sample_type"
+ATTR_MEASUREMENT_LOCATION = "measurement_location"
 
 
 class PetType(StrEnum):
@@ -185,3 +197,24 @@ class VomitType(StrEnum):
     FOOD = "food"
     BILE = "bile"
     OTHER = "other"
+
+
+class GlucoseMonitorType(StrEnum):
+    """Type of glucose monitor used."""
+
+    HUMAN_MONITOR = "human_monitor"
+    PET_MONITOR = "pet_monitor"
+
+
+class KetoneSampleType(StrEnum):
+    """Type of ketone sample."""
+
+    URINE = "urine"
+    BLOOD = "blood"
+
+
+class MeasurementLocation(StrEnum):
+    """Where the measurement was taken."""
+
+    HOME = "home"
+    VET = "vet"

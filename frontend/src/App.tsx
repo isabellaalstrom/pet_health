@@ -494,6 +494,18 @@ function App({ hass }: AppProps) {
   const [showVomitDialog, setShowVomitDialog] = useState(false);
   const [vomitFormData, setVomitFormData] = useState({ vomit_type: 'other', notes: '', timestamp: '' });
 
+  // Blood glucose dialog
+  const [showBloodGlucoseDialog, setShowBloodGlucoseDialog] = useState(false);
+  const [bloodGlucoseFormData, setBloodGlucoseFormData] = useState({ value: '', monitor_type: 'pet_monitor', measurement_location: 'home', notes: '', timestamp: '' });
+
+  // Glycated hemoglobin dialog
+  const [showGlycatedHemoglobinDialog, setShowGlycatedHemoglobinDialog] = useState(false);
+  const [glycatedHemoglobinFormData, setGlycatedHemoglobinFormData] = useState({ value: '', measurement_location: 'vet', notes: '', timestamp: '' });
+
+  // Ketones dialog
+  const [showKetonesDialog, setShowKetonesDialog] = useState(false);
+  const [ketonesFormData, setKetonesFormData] = useState({ value: '', sample_type: 'urine', measurement_location: 'home', notes: '', timestamp: '' });
+
   // Auto-select first pet
   useEffect(() => {
     if (pets.length > 0 && !selectedPetId) {
@@ -947,6 +959,66 @@ function App({ hass }: AppProps) {
     } catch (err) {
       console.error('Failed to log vomit:', err);
       alert('Failed to log vomit: ' + (err as Error).message);
+    }
+  };
+
+  const submitLogBloodGlucose = async () => {
+    if (!api || !selectedPetId) return;
+    const value = parseFloat(bloodGlucoseFormData.value);
+    if (isNaN(value) || value <= 0) {
+      alert('Please enter a valid blood glucose value');
+      return;
+    }
+    try {
+      const loggedAt = bloodGlucoseFormData.timestamp ? new Date(bloodGlucoseFormData.timestamp).toISOString() : undefined;
+      await api.logBloodGlucose(selectedPetId, value, bloodGlucoseFormData.monitor_type, bloodGlucoseFormData.measurement_location, bloodGlucoseFormData.notes || undefined, loggedAt);
+      setShowBloodGlucoseDialog(false);
+      setBloodGlucoseFormData({ value: '', monitor_type: 'pet_monitor', measurement_location: 'home', notes: '', timestamp: '' });
+      const data = await api.getStoreDump(selectedPetId);
+      setStoreData(data);
+    } catch (err) {
+      console.error('Failed to log blood glucose:', err);
+      alert('Failed to log blood glucose: ' + (err as Error).message);
+    }
+  };
+
+  const submitLogGlycatedHemoglobin = async () => {
+    if (!api || !selectedPetId) return;
+    const value = parseFloat(glycatedHemoglobinFormData.value);
+    if (isNaN(value) || value <= 0) {
+      alert('Please enter a valid HbA1c value');
+      return;
+    }
+    try {
+      const loggedAt = glycatedHemoglobinFormData.timestamp ? new Date(glycatedHemoglobinFormData.timestamp).toISOString() : undefined;
+      await api.logGlycatedHemoglobin(selectedPetId, value, glycatedHemoglobinFormData.measurement_location, glycatedHemoglobinFormData.notes || undefined, loggedAt);
+      setShowGlycatedHemoglobinDialog(false);
+      setGlycatedHemoglobinFormData({ value: '', measurement_location: 'vet', notes: '', timestamp: '' });
+      const data = await api.getStoreDump(selectedPetId);
+      setStoreData(data);
+    } catch (err) {
+      console.error('Failed to log HbA1c:', err);
+      alert('Failed to log HbA1c: ' + (err as Error).message);
+    }
+  };
+
+  const submitLogKetones = async () => {
+    if (!api || !selectedPetId) return;
+    const value = parseFloat(ketonesFormData.value);
+    if (isNaN(value) || value < 0) {
+      alert('Please enter a valid ketone value');
+      return;
+    }
+    try {
+      const loggedAt = ketonesFormData.timestamp ? new Date(ketonesFormData.timestamp).toISOString() : undefined;
+      await api.logKetones(selectedPetId, value, ketonesFormData.sample_type, ketonesFormData.measurement_location, ketonesFormData.notes || undefined, loggedAt);
+      setShowKetonesDialog(false);
+      setKetonesFormData({ value: '', sample_type: 'urine', measurement_location: 'home', notes: '', timestamp: '' });
+      const data = await api.getStoreDump(selectedPetId);
+      setStoreData(data);
+    } catch (err) {
+      console.error('Failed to log ketones:', err);
+      alert('Failed to log ketones: ' + (err as Error).message);
     }
   };
 
@@ -1455,6 +1527,112 @@ function App({ hass }: AppProps) {
               </table>
             ) : (
               <p>No vomit records yet.</p>
+            )}
+          </div>
+
+          {/* Blood Glucose Records */}
+          <div style={styles.card}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+              <h3 style={{...styles.h3, margin: 0, border: 'none', paddingBottom: 0}}>Blood Glucose</h3>
+              <button style={styles.button} onClick={() => { setBloodGlucoseFormData({ value: '', monitor_type: 'pet_monitor', measurement_location: 'home', notes: '', timestamp: '' }); setShowBloodGlucoseDialog(true); }}>
+                + Log Blood Glucose
+              </button>
+            </div>
+            {storeData.blood_glucose && storeData.blood_glucose.length > 0 ? (
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Time</th>
+                    <th style={styles.th}>Value (mmol/L)</th>
+                    <th style={styles.th}>Monitor</th>
+                    <th style={styles.th}>Location</th>
+                    <th style={styles.th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeData.blood_glucose.map((record: any, idx: number) => (
+                    <tr key={idx} style={idx % 2 === 0 ? styles.tr : {...styles.tr, background: '#f9fafb'}}>
+                      <td style={styles.td}>{formatTimestamp(record.timestamp)}</td>
+                      <td style={styles.td}>{record.value}</td>
+                      <td style={styles.td}>{record.monitor_type === 'pet_monitor' ? 'Pet monitor' : 'Human monitor'}</td>
+                      <td style={styles.td}>{record.measurement_location === 'vet' ? 'Vet' : 'Home'}</td>
+                      <td style={styles.td}>{record.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>No blood glucose records yet.</p>
+            )}
+          </div>
+
+          {/* Glycated Hemoglobin (HbA1c) Records */}
+          <div style={styles.card}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+              <h3 style={{...styles.h3, margin: 0, border: 'none', paddingBottom: 0}}>Glycated Hemoglobin (HbA1c)</h3>
+              <button style={styles.button} onClick={() => { setGlycatedHemoglobinFormData({ value: '', measurement_location: 'vet', notes: '', timestamp: '' }); setShowGlycatedHemoglobinDialog(true); }}>
+                + Log HbA1c
+              </button>
+            </div>
+            {storeData.glycated_hemoglobin && storeData.glycated_hemoglobin.length > 0 ? (
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Time</th>
+                    <th style={styles.th}>Value (%)</th>
+                    <th style={styles.th}>Location</th>
+                    <th style={styles.th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeData.glycated_hemoglobin.map((record: any, idx: number) => (
+                    <tr key={idx} style={idx % 2 === 0 ? styles.tr : {...styles.tr, background: '#f9fafb'}}>
+                      <td style={styles.td}>{formatTimestamp(record.timestamp)}</td>
+                      <td style={styles.td}>{record.value}%</td>
+                      <td style={styles.td}>{record.measurement_location === 'vet' ? 'Vet' : 'Home'}</td>
+                      <td style={styles.td}>{record.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>No HbA1c records yet.</p>
+            )}
+          </div>
+
+          {/* Ketone Records */}
+          <div style={styles.card}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+              <h3 style={{...styles.h3, margin: 0, border: 'none', paddingBottom: 0}}>Ketones</h3>
+              <button style={styles.button} onClick={() => { setKetonesFormData({ value: '', sample_type: 'urine', measurement_location: 'home', notes: '', timestamp: '' }); setShowKetonesDialog(true); }}>
+                + Log Ketones
+              </button>
+            </div>
+            {storeData.ketones && storeData.ketones.length > 0 ? (
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Time</th>
+                    <th style={styles.th}>Value (mmol/L)</th>
+                    <th style={styles.th}>Sample</th>
+                    <th style={styles.th}>Location</th>
+                    <th style={styles.th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeData.ketones.map((record: any, idx: number) => (
+                    <tr key={idx} style={idx % 2 === 0 ? styles.tr : {...styles.tr, background: '#f9fafb'}}>
+                      <td style={styles.td}>{formatTimestamp(record.timestamp)}</td>
+                      <td style={styles.td}>{record.value}</td>
+                      <td style={styles.td}>{record.sample_type === 'blood' ? 'Blood' : 'Urine'}</td>
+                      <td style={styles.td}>{record.measurement_location === 'vet' ? 'Vet' : 'Home'}</td>
+                      <td style={styles.td}>{record.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>No ketone records yet.</p>
             )}
           </div>
         </div>
@@ -2330,6 +2508,171 @@ function App({ hass }: AppProps) {
             <div style={styles.dialogButtons}>
               <button style={styles.actionButton} onClick={submitLogVomit}>Submit</button>
               <button style={styles.actionButton} onClick={() => setShowVomitDialog(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log Blood Glucose Dialog */}
+      {showBloodGlucoseDialog && (
+        <div style={styles.dialogOverlay} onClick={() => setShowBloodGlucoseDialog(false)}>
+          <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.h2}>Log Blood Glucose</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Value (mmol/L):
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  max="100"
+                  value={bloodGlucoseFormData.value}
+                  onChange={(e) => setBloodGlucoseFormData({...bloodGlucoseFormData, value: e.target.value})}
+                  style={styles.input}
+                  placeholder="e.g. 5.5"
+                />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Monitor type:
+                <select value={bloodGlucoseFormData.monitor_type} onChange={(e) => setBloodGlucoseFormData({...bloodGlucoseFormData, monitor_type: e.target.value})} style={styles.input}>
+                  <option value="pet_monitor">Pet monitor</option>
+                  <option value="human_monitor">Human monitor</option>
+                </select>
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Location:
+                <select value={bloodGlucoseFormData.measurement_location} onChange={(e) => setBloodGlucoseFormData({...bloodGlucoseFormData, measurement_location: e.target.value})} style={styles.input}>
+                  <option value="home">Home</option>
+                  <option value="vet">Vet</option>
+                </select>
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Notes:
+                <textarea value={bloodGlucoseFormData.notes} onChange={(e) => setBloodGlucoseFormData({...bloodGlucoseFormData, notes: e.target.value})} rows={3} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Time (leave empty for now):
+                <input type="datetime-local" value={bloodGlucoseFormData.timestamp} onChange={(e) => setBloodGlucoseFormData({...bloodGlucoseFormData, timestamp: e.target.value})} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.dialogButtons}>
+              <button style={styles.actionButton} onClick={submitLogBloodGlucose}>Submit</button>
+              <button style={styles.actionButton} onClick={() => setShowBloodGlucoseDialog(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log Glycated Hemoglobin (HbA1c) Dialog */}
+      {showGlycatedHemoglobinDialog && (
+        <div style={styles.dialogOverlay} onClick={() => setShowGlycatedHemoglobinDialog(false)}>
+          <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.h2}>Log Glycated Hemoglobin (HbA1c)</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Value (%):
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  max="30"
+                  value={glycatedHemoglobinFormData.value}
+                  onChange={(e) => setGlycatedHemoglobinFormData({...glycatedHemoglobinFormData, value: e.target.value})}
+                  style={styles.input}
+                  placeholder="e.g. 5.7"
+                />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Location:
+                <select value={glycatedHemoglobinFormData.measurement_location} onChange={(e) => setGlycatedHemoglobinFormData({...glycatedHemoglobinFormData, measurement_location: e.target.value})} style={styles.input}>
+                  <option value="vet">Vet</option>
+                  <option value="home">Home</option>
+                </select>
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Notes:
+                <textarea value={glycatedHemoglobinFormData.notes} onChange={(e) => setGlycatedHemoglobinFormData({...glycatedHemoglobinFormData, notes: e.target.value})} rows={3} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Time (leave empty for now):
+                <input type="datetime-local" value={glycatedHemoglobinFormData.timestamp} onChange={(e) => setGlycatedHemoglobinFormData({...glycatedHemoglobinFormData, timestamp: e.target.value})} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.dialogButtons}>
+              <button style={styles.actionButton} onClick={submitLogGlycatedHemoglobin}>Submit</button>
+              <button style={styles.actionButton} onClick={() => setShowGlycatedHemoglobinDialog(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log Ketones Dialog */}
+      {showKetonesDialog && (
+        <div style={styles.dialogOverlay} onClick={() => setShowKetonesDialog(false)}>
+          <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.h2}>Log Ketones</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Value (mmol/L):
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={ketonesFormData.value}
+                  onChange={(e) => setKetonesFormData({...ketonesFormData, value: e.target.value})}
+                  style={styles.input}
+                  placeholder="e.g. 0.5"
+                />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Sample type:
+                <select value={ketonesFormData.sample_type} onChange={(e) => setKetonesFormData({...ketonesFormData, sample_type: e.target.value})} style={styles.input}>
+                  <option value="urine">Urine</option>
+                  <option value="blood">Blood</option>
+                </select>
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Location:
+                <select value={ketonesFormData.measurement_location} onChange={(e) => setKetonesFormData({...ketonesFormData, measurement_location: e.target.value})} style={styles.input}>
+                  <option value="home">Home</option>
+                  <option value="vet">Vet</option>
+                </select>
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Notes:
+                <textarea value={ketonesFormData.notes} onChange={(e) => setKetonesFormData({...ketonesFormData, notes: e.target.value})} rows={3} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Time (leave empty for now):
+                <input type="datetime-local" value={ketonesFormData.timestamp} onChange={(e) => setKetonesFormData({...ketonesFormData, timestamp: e.target.value})} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.dialogButtons}>
+              <button style={styles.actionButton} onClick={submitLogKetones}>Submit</button>
+              <button style={styles.actionButton} onClick={() => setShowKetonesDialog(false)}>Cancel</button>
             </div>
           </div>
         </div>

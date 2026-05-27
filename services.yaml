@@ -581,3 +581,171 @@ log_generic:
       required: false
       selector:
         datetime:
+
+log_blood_glucose:
+  name: Log blood glucose
+  description: Record a blood glucose measurement for a pet
+  fields:
+    config_entry_id:
+      name: Pet
+      description: The pet being measured
+      required: true
+      selector:
+        config_entry:
+          integration: pet_health
+    value:
+      name: Value (mmol/L)
+      description: Blood glucose value in mmol/L
+      required: true
+      selector:
+        number:
+          min: 0.1
+          max: 100.0
+          step: 0.1
+          unit_of_measurement: mmol/L
+          mode: box
+    monitor_type:
+      name: Monitor type
+      description: The type of monitor used for the measurement
+      required: false
+      default: pet_monitor
+      selector:
+        select:
+          options:
+            - label: Pet monitor
+              value: pet_monitor
+            - label: Human monitor
+              value: human_monitor
+    measurement_location:
+      name: Measurement location
+      description: Where the measurement was taken
+      required: false
+      default: home
+      selector:
+        select:
+          options:
+            - label: Home
+              value: home
+            - label: Vet
+              value: vet
+    logged_at:
+      name: Logged at
+      description: When the measurement was taken. If not specified, uses current time.
+      required: false
+      selector:
+        datetime:
+    notes:
+      name: Notes
+      description: Additional notes about the measurement
+      required: false
+      selector:
+        text:
+          multiline: true
+
+log_glycated_hemoglobin:
+  name: Log glycated hemoglobin (HbA1c)
+  description: Record a glycated hemoglobin (HbA1c / långtidssocker) measurement for a pet
+  fields:
+    config_entry_id:
+      name: Pet
+      description: The pet being measured
+      required: true
+      selector:
+        config_entry:
+          integration: pet_health
+    value:
+      name: Value (%)
+      description: Glycated hemoglobin value in percent
+      required: true
+      selector:
+        number:
+          min: 0.1
+          max: 30.0
+          step: 0.1
+          unit_of_measurement: "%"
+          mode: box
+    measurement_location:
+      name: Measurement location
+      description: Where the measurement was taken
+      required: false
+      default: vet
+      selector:
+        select:
+          options:
+            - label: Vet
+              value: vet
+            - label: Home
+              value: home
+    logged_at:
+      name: Logged at
+      description: When the measurement was taken. If not specified, uses current time.
+      required: false
+      selector:
+        datetime:
+    notes:
+      name: Notes
+      description: Additional notes about the measurement
+      required: false
+      selector:
+        text:
+          multiline: true
+
+log_ketones:
+  name: Log ketones
+  description: Record a ketone measurement for a pet
+  fields:
+    config_entry_id:
+      name: Pet
+      description: The pet being measured
+      required: true
+      selector:
+        config_entry:
+          integration: pet_health
+    value:
+      name: Value (mmol/L)
+      description: Ketone value in mmol/L
+      required: true
+      selector:
+        number:
+          min: 0.0
+          max: 100.0
+          step: 0.1
+          unit_of_measurement: mmol/L
+          mode: box
+    sample_type:
+      name: Sample type
+      description: Whether the ketone sample is from urine or blood
+      required: false
+      default: urine
+      selector:
+        select:
+          options:
+            - label: Urine
+              value: urine
+            - label: Blood
+              value: blood
+    measurement_location:
+      name: Measurement location
+      description: Where the measurement was taken
+      required: false
+      default: home
+      selector:
+        select:
+          options:
+            - label: Home
+              value: home
+            - label: Vet
+              value: vet
+    logged_at:
+      name: Logged at
+      description: When the measurement was taken. If not specified, uses current time.
+      required: false
+      selector:
+        datetime:
+    notes:
+      name: Notes
+      description: Additional notes about the measurement
+      required: false
+      selector:
+        text:
+          multiline: true
