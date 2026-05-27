@@ -523,13 +523,13 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         removed_unknown_visits = 0
         changed_pet_ids: set[str] = set()
 
+        def confirm(updated_visit: BathroomVisit) -> None:
+            updated_visit.confirmed = True
+
         for pet_id in pet_ids:
-            for visit in list(store.get_visits(pet_id)):
+            for visit in store.get_visits(pet_id):
                 if visit.confirmed:
                     continue
-
-                def confirm(updated_visit: BathroomVisit) -> None:
-                    updated_visit.confirmed = True
 
                 if await store.async_update_visit(visit.visit_id, confirm):
                     confirmed_visits += 1

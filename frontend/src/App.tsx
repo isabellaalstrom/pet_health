@@ -673,10 +673,10 @@ function App({ hass }: AppProps) {
   };
 
   const handleConfirmAllVisits = async () => {
-    if (!api || !selectedPetId) return;
+    if (!api) return;
 
     try {
-      await api.confirmAllVisits(selectedPetId, removeUnknownVisitsOnConfirmAll);
+      await api.confirmAllVisits(selectedPetId ?? undefined, removeUnknownVisitsOnConfirmAll);
       reloadVisits();
     } catch (err) {
       console.error('Failed to confirm all visits:', err);
