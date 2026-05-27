@@ -287,7 +287,7 @@ SERVICE_LOG_BLOOD_GLUCOSE_SCHEMA = vol.Schema(
             [m.value for m in GlucoseMonitorType]
         ),
         vol.Optional(ATTR_MEASUREMENT_LOCATION, default="home"): vol.In(
-            [l.value for l in MeasurementLocation]
+            [loc.value for loc in MeasurementLocation]
         ),
         vol.Optional(ATTR_LOGGED_AT): cv.datetime,
         vol.Optional(ATTR_NOTES): cv.string,
@@ -302,7 +302,7 @@ SERVICE_LOG_GLYCATED_HEMOGLOBIN_SCHEMA = vol.Schema(
             vol.Coerce(float), vol.Range(min=0.1, max=30.0)
         ),
         vol.Optional(ATTR_MEASUREMENT_LOCATION, default="vet"): vol.In(
-            [l.value for l in MeasurementLocation]
+            [loc.value for loc in MeasurementLocation]
         ),
         vol.Optional(ATTR_LOGGED_AT): cv.datetime,
         vol.Optional(ATTR_NOTES): cv.string,
@@ -320,7 +320,7 @@ SERVICE_LOG_KETONES_SCHEMA = vol.Schema(
             [s.value for s in KetoneSampleType]
         ),
         vol.Optional(ATTR_MEASUREMENT_LOCATION, default="home"): vol.In(
-            [l.value for l in MeasurementLocation]
+            [loc.value for loc in MeasurementLocation]
         ),
         vol.Optional(ATTR_LOGGED_AT): cv.datetime,
         vol.Optional(ATTR_NOTES): cv.string,

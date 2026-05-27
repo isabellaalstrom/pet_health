@@ -474,6 +474,92 @@
           "description": "Additional notes about the incident"
         }
       }
+    },
+    "log_blood_glucose": {
+      "name": "Log blood glucose",
+      "description": "Record a blood glucose measurement for a pet",
+      "fields": {
+        "config_entry_id": {
+          "name": "Pet",
+          "description": "The pet being measured"
+        },
+        "value": {
+          "name": "Value (mmol/L)",
+          "description": "Blood glucose value in mmol/L"
+        },
+        "monitor_type": {
+          "name": "Monitor type",
+          "description": "The type of monitor used for the measurement"
+        },
+        "measurement_location": {
+          "name": "Measurement location",
+          "description": "Where the measurement was taken"
+        },
+        "logged_at": {
+          "name": "Logged at",
+          "description": "When the measurement was taken. If not specified, uses current time."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Additional notes about the measurement"
+        }
+      }
+    },
+    "log_glycated_hemoglobin": {
+      "name": "Log glycated hemoglobin (HbA1c)",
+      "description": "Record a glycated hemoglobin (HbA1c / långtidssocker) measurement for a pet",
+      "fields": {
+        "config_entry_id": {
+          "name": "Pet",
+          "description": "The pet being measured"
+        },
+        "value": {
+          "name": "Value (%)",
+          "description": "Glycated hemoglobin value in percent"
+        },
+        "measurement_location": {
+          "name": "Measurement location",
+          "description": "Where the measurement was taken"
+        },
+        "logged_at": {
+          "name": "Logged at",
+          "description": "When the measurement was taken. If not specified, uses current time."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Additional notes about the measurement"
+        }
+      }
+    },
+    "log_ketones": {
+      "name": "Log ketones",
+      "description": "Record a ketone measurement for a pet",
+      "fields": {
+        "config_entry_id": {
+          "name": "Pet",
+          "description": "The pet being measured"
+        },
+        "value": {
+          "name": "Value (mmol/L)",
+          "description": "Ketone value in mmol/L"
+        },
+        "sample_type": {
+          "name": "Sample type",
+          "description": "Whether the ketone sample is from urine or blood"
+        },
+        "measurement_location": {
+          "name": "Measurement location",
+          "description": "Where the measurement was taken"
+        },
+        "logged_at": {
+          "name": "Logged at",
+          "description": "When the measurement was taken. If not specified, uses current time."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Additional notes about the measurement"
+        }
+      }
     }
   }
 }
