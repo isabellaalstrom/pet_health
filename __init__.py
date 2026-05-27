@@ -35,6 +35,7 @@ from .const import (
     ATTR_NOTES,
     ATTR_POOP_COLOR,
     ATTR_POOP_CONSISTENCIES,
+    ATTR_REMOVE_UNKNOWN_VISITS,
     ATTR_REASON,
     ATTR_SAMPLE_TYPE,
     ATTR_SYMPTOMS,
@@ -57,6 +58,7 @@ from .const import (
     DOMAIN,
     EVENT_PET_HEALTH_DATA_UPDATED,
     SERVICE_AMEND_VISIT,
+    SERVICE_CONFIRM_ALL_VISITS,
     SERVICE_CONFIRM_VISIT,
     SERVICE_DELETE_VISIT,
     SERVICE_LOG_APPETITE,
@@ -147,6 +149,14 @@ SERVICE_LOG_MEDICATION_SCHEMA = vol.Schema(
 SERVICE_CONFIRM_VISIT_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_VISIT_ID): cv.string,
+    }
+)
+
+# Schema for confirm_all_visits service
+SERVICE_CONFIRM_ALL_VISITS_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
+        vol.Optional(ATTR_REMOVE_UNKNOWN_VISITS, default=False): cv.boolean,
     }
 )
 
@@ -550,6 +560,71 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             return {"visit_id": visit_id, "confirmed": True}
         else:
             raise HomeAssistantError(f"Visit {visit_id} not found")
+
+    async def handle_confirm_all_visits(call: ServiceCall) -> ServiceResponse:
+        """Handle the confirm_all_visits service call."""
+        entry_id = call.data.get(ATTR_CONFIG_ENTRY_ID)
+        remove_unknown_visits = call.data.get(ATTR_REMOVE_UNKNOWN_VISITS, False)
+
+        pet_ids: list[str]
+        if entry_id:
+            entry = hass.config_entries.async_get_entry(entry_id)
+            if not entry:
+                raise HomeAssistantError(f"Config entry {entry_id} not found")
+            if entry.domain != DOMAIN:
+                raise HomeAssistantError(
+                    f"Config entry {entry_id} is not a pet_health entry"
+                )
+            pet_data: PetData = entry.runtime_data
+            pet_ids = [pet_data.pet_id]
+        else:
+            pet_ids = [
+                entry.runtime_data.pet_id
+                for entry in hass.config_entries.async_entries(DOMAIN)
+            ]
+
+        confirmed_visits = 0
+        removed_unknown_visits = 0
+        changed_pet_ids: set[str] = set()
+
+        def confirm(updated_visit: BathroomVisit) -> None:
+            updated_visit.confirmed = True
+
+        for pet_id in pet_ids:
+            for visit in store.get_visits(pet_id):
+                if visit.confirmed:
+                    continue
+
+                if await store.async_update_visit(visit.visit_id, confirm):
+                    confirmed_visits += 1
+                    changed_pet_ids.add(pet_id)
+
+        if remove_unknown_visits:
+            for visit in list(store.get_visits(UNKNOWN_ENTRY_ID)):
+                if await store.async_delete_visit(visit.visit_id):
+                    removed_unknown_visits += 1
+                    changed_pet_ids.add(UNKNOWN_ENTRY_ID)
+
+        for pet_id in changed_pet_ids:
+            hass.bus.async_fire(
+                EVENT_PET_HEALTH_DATA_UPDATED,
+                {"pet_id": pet_id, "data_type": "visit"},
+            )
+
+        _LOGGER.info(
+            "Confirmed %s visit(s)%s%s",
+            confirmed_visits,
+            f" for config entry {entry_id}" if entry_id else " across all pets",
+            f"; removed {removed_unknown_visits} unknown visit(s)"
+            if remove_unknown_visits
+            else "",
+        )
+
+        return {
+            "confirmed_visits": confirmed_visits,
+            "removed_unknown_visits": removed_unknown_visits,
+            "scope": "single_pet" if entry_id else "all_pets",
+        }
 
     async def handle_reassign_visit(call: ServiceCall) -> ServiceResponse:
         """Handle the reassign_visit service call."""
@@ -1283,6 +1358,14 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         SERVICE_CONFIRM_VISIT,
         handle_confirm_visit,
         schema=SERVICE_CONFIRM_VISIT_SCHEMA,
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CONFIRM_ALL_VISITS,
+        handle_confirm_all_visits,
+        schema=SERVICE_CONFIRM_ALL_VISITS_SCHEMA,
         supports_response=True,
     )
 

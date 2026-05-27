@@ -464,6 +464,7 @@ function App({ hass }: AppProps) {
     timestamp: '',
   });
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [removeUnknownVisitsOnConfirmAll, setRemoveUnknownVisitsOnConfirmAll] = useState(false);
 
   // Drink dialog
   const [showDrinkDialog, setShowDrinkDialog] = useState(false);
@@ -708,6 +709,22 @@ function App({ hass }: AppProps) {
     } catch (err) {
       console.error('Failed to confirm visit:', err);
       alert('Failed to confirm visit: ' + (err as Error).message);
+    }
+  };
+
+  const handleConfirmAllVisits = async () => {
+    if (!api) return;
+    const confirmMessage = removeUnknownVisitsOnConfirmAll
+      ? 'Are you sure you want to confirm all visits and delete all unknown visits?'
+      : 'Are you sure you want to confirm all visits?';
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      await api.confirmAllVisits(selectedPetId ?? undefined, removeUnknownVisitsOnConfirmAll);
+      reloadVisits();
+    } catch (err) {
+      console.error('Failed to confirm all visits:', err);
+      alert('Failed to confirm all visits: ' + (err as Error).message);
     }
   };
 
@@ -1207,6 +1224,19 @@ function App({ hass }: AppProps) {
             <button style={s('actionButton')} onClick={handleLogVisit}>
               Log New Visit
             </button>
+            <div style={{marginTop: '12px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap'}}>
+              <button style={s('actionButton')} onClick={handleConfirmAllVisits}>
+                Confirm All Visits
+              </button>
+              <label style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: isMobile ? '13px' : '14px'}}>
+                <input
+                  type="checkbox"
+                  checked={removeUnknownVisitsOnConfirmAll}
+                  onChange={(e) => setRemoveUnknownVisitsOnConfirmAll(e.target.checked)}
+                />
+                Also delete all unknown visits
+              </label>
+            </div>
 
             {visits.length === 0 ? (
               <p>No visits recorded yet.</p>
