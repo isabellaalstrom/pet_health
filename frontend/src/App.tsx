@@ -702,6 +702,10 @@ function App({ hass }: AppProps) {
 
   const handleConfirmAllVisits = async () => {
     if (!api) return;
+    const confirmMessage = removeUnknownVisitsOnConfirmAll
+      ? 'Are you sure you want to confirm all visits and delete all unknown visits?'
+      : 'Are you sure you want to confirm all visits?';
+    if (!confirm(confirmMessage)) return;
 
     try {
       await api.confirmAllVisits(selectedPetId ?? undefined, removeUnknownVisitsOnConfirmAll);
@@ -1158,7 +1162,7 @@ function App({ hass }: AppProps) {
                   checked={removeUnknownVisitsOnConfirmAll}
                   onChange={(e) => setRemoveUnknownVisitsOnConfirmAll(e.target.checked)}
                 />
-                Remove unknown visits
+                Also delete all unknown visits
               </label>
             </div>
 

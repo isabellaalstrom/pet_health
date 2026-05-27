@@ -153,7 +153,7 @@ confirm_all_visits:
           integration: pet_health
     remove_unknown_visits:
       name: Remove unknown visits
-      description: If enabled, unknown visits are deleted instead of being left unchanged.
+      description: "If enabled, all unknown visits are deleted (globally — regardless of which pet is selected). This option is not scoped to the pet specified by config_entry_id."
       required: false
       default: false
       selector:

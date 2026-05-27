@@ -265,7 +265,7 @@
         },
         "remove_unknown_visits": {
           "name": "Remove unknown visits",
-          "description": "If enabled, unknown visits are deleted instead of being left unchanged."
+          "description": "If enabled, all unknown visits are deleted globally — regardless of which pet is selected via config_entry_id."
         }
       }
     },
