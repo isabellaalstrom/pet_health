@@ -2041,12 +2041,24 @@ function App({ hass }: AppProps) {
       {/* Log Drink Dialog */}
       {showDrinkDialog && (
         <div style={styles.dialogOverlay} onClick={() => setShowDrinkDialog(false)}>
-          <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
-            <h2 style={styles.h2}>Log Drink</h2>
+          <div
+            style={styles.dialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="log-drink-dialog-title"
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setShowDrinkDialog(false);
+              }
+            }}
+          >
+            <h2 id="log-drink-dialog-title" style={styles.h2}>Log Drink</h2>
             <div style={styles.formGroup}>
               <label style={styles.label}>
                 Amount:
-                <select value={drinkFormData.amount} onChange={(e) => setDrinkFormData({...drinkFormData, amount: e.target.value})} style={styles.input}>
+                <select autoFocus value={drinkFormData.amount} onChange={(e) => setDrinkFormData({...drinkFormData, amount: e.target.value})} style={styles.input}>
                   <option value="small">Small</option>
                   <option value="normal">Normal</option>
                   <option value="large">Large</option>
