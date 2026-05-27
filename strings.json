@@ -39,6 +39,13 @@
           "pet_image_path": "Image path"
         }
       },
+      "features": {
+        "title": "Manage features for {pet_name}",
+        "description": "Turn individual feature areas on or off for this pet.",
+        "data": {
+          "enable_bathroom_visits": "Enable bathroom visits"
+        }
+      },
       "medication_list": {
         "title": "Manage medications for {pet_name}",
         "description": "Add, edit, or remove medications",

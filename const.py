@@ -19,6 +19,7 @@ CONF_PET_IMAGE_PATH = "pet_image_path"
 # Options keys
 CONF_MEDICATIONS = "medications"
 CONF_GENERIC_LOG_CATEGORIES = "generic_log_categories"
+CONF_ENABLE_BATHROOM_VISITS = "enable_bathroom_visits"
 
 # Medication config keys
 CONF_MEDICATION_ID = "medication_id"

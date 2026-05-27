@@ -32,6 +32,13 @@
           "action": "Action"
         }
       },
+      "features": {
+        "title": "Manage features for {pet_name}",
+        "description": "Turn individual feature areas on or off for this pet.",
+        "data": {
+          "enable_bathroom_visits": "Enable bathroom visits"
+        }
+      },
       "add_medication": {
         "title": "Add medication",
         "description": "Configure a new medication",

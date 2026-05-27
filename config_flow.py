@@ -29,6 +29,7 @@ from homeassistant.util import slugify
 from .const import (
     CONF_CATEGORY_ID,
     CONF_CATEGORY_NAME,
+    CONF_ENABLE_BATHROOM_VISITS,
     CONF_GENERIC_LOG_CATEGORIES,
     CONF_MEDICATION_ACTIVE,
     CONF_MEDICATION_DOSAGE,
@@ -133,6 +134,13 @@ class PetHealthOptionsFlow(OptionsFlow):
     _category_id: str | None = None
     _editing_category: dict[str, Any] | None = None
 
+    def _create_options_entry(self, updates: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Create options entry while preserving existing options."""
+        options = dict(self.config_entry.options)
+        if updates:
+            options.update(updates)
+        return self.async_create_entry(title="", data=options)
+
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -153,11 +161,13 @@ class PetHealthOptionsFlow(OptionsFlow):
             action = user_input.get("action")
             if action == "edit_image":
                 return await self.async_step_edit_image()
+            if action == "features":
+                return await self.async_step_features()
             if action == "medications":
                 return await self.async_step_medication_list()
             if action == "categories":
                 return await self.async_step_category_list()
-            return self.async_create_entry(title="", data={})
+            return self._create_options_entry()
 
         return self.async_show_form(
             step_id="init",
@@ -167,6 +177,7 @@ class PetHealthOptionsFlow(OptionsFlow):
                         SelectSelectorConfig(
                             options=[
                                 {"label": "Edit pet image", "value": "edit_image"},
+                                {"label": "Manage features", "value": "features"},
                                 {"label": "Manage medications", "value": "medications"},
                                 {"label": "Manage log categories", "value": "categories"},
                                 {"label": "Done", "value": "done"},
@@ -207,7 +218,7 @@ class PetHealthOptionsFlow(OptionsFlow):
             self.hass.config_entries.async_update_entry(
                 self.config_entry, data=new_data
             )
-            return self.async_create_entry(title="", data={})
+            return self._create_options_entry()
 
         current_image_path = self.config_entry.data.get(CONF_PET_IMAGE_PATH, "")
 
@@ -218,6 +229,34 @@ class PetHealthOptionsFlow(OptionsFlow):
                     vol.Optional(
                         CONF_PET_IMAGE_PATH, default=current_image_path
                     ): TextSelector(),
+                }
+            ),
+            description_placeholders={"pet_name": self.config_entry.title},
+        )
+
+    async def async_step_features(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Manage per-pet feature toggles."""
+        if user_input is not None:
+            return self._create_options_entry(
+                {
+                    CONF_ENABLE_BATHROOM_VISITS: user_input.get(
+                        CONF_ENABLE_BATHROOM_VISITS, True
+                    )
+                }
+            )
+
+        return self.async_show_form(
+            step_id="features",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_ENABLE_BATHROOM_VISITS,
+                        default=self.config_entry.options.get(
+                            CONF_ENABLE_BATHROOM_VISITS, True
+                        ),
+                    ): bool,
                 }
             ),
             description_placeholders={"pet_name": self.config_entry.title},
@@ -249,11 +288,8 @@ class PetHealthOptionsFlow(OptionsFlow):
                 medications = [
                     m for m in medications if m[CONF_MEDICATION_ID] != med_id
                 ]
-                return self.async_create_entry(
-                    title="",
-                    data={CONF_MEDICATIONS: medications},
-                )
-            return self.async_create_entry(title="", data={})
+                return self._create_options_entry({CONF_MEDICATIONS: medications})
+            return self._create_options_entry()
 
         # Build medication list options
         medications = self.config_entry.options.get(CONF_MEDICATIONS, [])
@@ -316,10 +352,7 @@ class PetHealthOptionsFlow(OptionsFlow):
                 medications = list(self.config_entry.options.get(CONF_MEDICATIONS, []))
                 medications.append(medication)
 
-                return self.async_create_entry(
-                    title="",
-                    data={CONF_MEDICATIONS: medications},
-                )
+                return self._create_options_entry({CONF_MEDICATIONS: medications})
 
         return self.async_show_form(
             step_id="add_medication",
@@ -388,10 +421,7 @@ class PetHealthOptionsFlow(OptionsFlow):
                         }
                         break
 
-                return self.async_create_entry(
-                    title="",
-                    data={CONF_MEDICATIONS: medications},
-                )
+                return self._create_options_entry({CONF_MEDICATIONS: medications})
 
         if not self._editing_medication:
             return await self.async_step_medication_list()
@@ -474,11 +504,10 @@ class PetHealthOptionsFlow(OptionsFlow):
                 categories = [
                     c for c in categories if c[CONF_CATEGORY_ID] != cat_id
                 ]
-                return self.async_create_entry(
-                    title="",
-                    data={CONF_GENERIC_LOG_CATEGORIES: categories},
+                return self._create_options_entry(
+                    {CONF_GENERIC_LOG_CATEGORIES: categories}
                 )
-            return self.async_create_entry(title="", data={})
+            return self._create_options_entry()
 
         # Build category list options
         categories = self.config_entry.options.get(CONF_GENERIC_LOG_CATEGORIES, [])
@@ -543,9 +572,8 @@ class PetHealthOptionsFlow(OptionsFlow):
 
                     categories.append(category)
 
-                    return self.async_create_entry(
-                        title="",
-                        data={CONF_GENERIC_LOG_CATEGORIES: categories},
+                    return self._create_options_entry(
+                        {CONF_GENERIC_LOG_CATEGORIES: categories}
                     )
         return self.async_show_form(
             step_id="add_category",
@@ -576,9 +604,8 @@ class PetHealthOptionsFlow(OptionsFlow):
                         }
                         break
 
-                return self.async_create_entry(
-                    title="",
-                    data={CONF_GENERIC_LOG_CATEGORIES: categories},
+                return self._create_options_entry(
+                    {CONF_GENERIC_LOG_CATEGORIES: categories}
                 )
 
         if not self._editing_category:
