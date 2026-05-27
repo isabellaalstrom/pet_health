@@ -164,6 +164,8 @@ class MedicationFrequency(StrEnum):
     EVERY_8_HOURS = "every_8_hours"
     EVERY_12_HOURS = "every_12_hours"
     WEEKLY = "weekly"
+    YEARLY = "yearly"
+    EVERY_THREE_YEARS = "every_three_years"
 
 
 class ConsumptionAmount(StrEnum):

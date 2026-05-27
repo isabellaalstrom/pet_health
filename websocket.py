@@ -118,6 +118,7 @@ async def handle_get_pet_data(
                     "medication_name": med.get("medication_name"),
                     "dosage": med.get("dosage", ""),
                     "unit": med.get("unit", ""),
+                    "frequency": med.get("frequency", ""),
                 }
             )
 
@@ -194,6 +195,7 @@ async def handle_get_medications(
             "medication_name": med.medication_name,
             "dosage": med.dosage,
             "unit": med.unit,
+            "frequency": med.frequency,
             "notes": med.notes,
         }
         for med in all_medications
