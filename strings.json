@@ -269,6 +269,20 @@
         }
       }
     },
+    "confirm_all_visits": {
+      "name": "Confirm all visits",
+      "description": "Confirm all unconfirmed bathroom visits for one pet or all pets, with optional removal of unknown visits",
+      "fields": {
+        "config_entry_id": {
+          "name": "Pet",
+          "description": "Optional. If set, only this pet's unconfirmed visits are confirmed; otherwise all pets are processed."
+        },
+        "remove_unknown_visits": {
+          "name": "Remove unknown visits",
+          "description": "If enabled, all unknown visits are deleted globally — regardless of which pet is selected via config_entry_id."
+        }
+      }
+    },
     "reassign_visit": {
       "name": "Reassign visit",
       "description": "Change which pet a visit belongs to (automatically marks as confirmed)",

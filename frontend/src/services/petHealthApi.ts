@@ -104,6 +104,18 @@ export class PetHealthAPI {
     });
   }
 
+  async confirmAllVisits(entryId?: string, removeUnknownVisits = false): Promise<void> {
+    const data: Record<string, unknown> = {
+      remove_unknown_visits: removeUnknownVisits,
+    };
+
+    if (entryId) {
+      data.config_entry_id = entryId;
+    }
+
+    await this.hass.callService('pet_health', 'confirm_all_visits', data);
+  }
+
   async deleteVisit(visitId: string): Promise<void> {
     await this.hass.callService('pet_health', 'delete_visit', {
       visit_id: visitId,

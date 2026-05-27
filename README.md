@@ -282,6 +282,26 @@ data:
 
 - Delete false positives via `pet_health.delete_visit` if an AI detection is incorrect.
 
+- Bulk-confirm all unconfirmed visits for one pet or all pets using `pet_health.confirm_all_visits`:
+
+```yaml
+# Confirm all unconfirmed visits across all pets
+service: pet_health.confirm_all_visits
+data: {}
+
+# Confirm only one pet's unconfirmed visits
+service: pet_health.confirm_all_visits
+data:
+  config_entry_id: '<config-entry-id>'
+
+# Confirm all visits and also delete all unknown visits (global — not scoped to a single pet)
+service: pet_health.confirm_all_visits
+data:
+  remove_unknown_visits: true
+```
+
+  > **Note:** `remove_unknown_visits: true` always deletes **all** unknown visits regardless of whether `config_entry_id` is provided. It is a global operation and is not limited to the selected pet.
+
 This workflow lets AI or camera systems push likely events while ensuring a human can verify and attribute them later.
 
 Config Flow — adding medicines and images
