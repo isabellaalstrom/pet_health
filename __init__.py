@@ -1122,14 +1122,22 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 ATTR_WEIGHT_GRAMS: call.data[ATTR_WEIGHT_GRAMS],
                 ATTR_LOGGED_AT: logged_at,
             }
-            weight_response = await hass.services.async_call(
-                DOMAIN,
-                SERVICE_LOG_WEIGHT,
-                weight_data,
-                blocking=True,
-                return_response=True,
-            )
-            response["weight"] = weight_response
+            try:
+                weight_response = await hass.services.async_call(
+                    DOMAIN,
+                    SERVICE_LOG_WEIGHT,
+                    weight_data,
+                    blocking=True,
+                    return_response=True,
+                )
+                response["weight"] = weight_response
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.error(
+                    "Vet visit logged but weight recording failed for %s: %s",
+                    pet_data.name,
+                    err,
+                )
+                response["weight_error"] = str(err)
 
         hass.bus.async_fire(EVENT_PET_HEALTH_DATA_UPDATED, {
             "pet_id": pet_data.pet_id,
