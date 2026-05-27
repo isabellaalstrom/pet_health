@@ -107,12 +107,9 @@ ATTR_CATEGORY_ID = "category_id"
 
 # Blood glucose / ketone attributes
 ATTR_VALUE = "value"
-ATTR_GLUCOSE_VALUE = ATTR_VALUE
 ATTR_MONITOR_TYPE = "monitor_type"
 ATTR_SAMPLE_TYPE = "sample_type"
 ATTR_MEASUREMENT_LOCATION = "measurement_location"
-ATTR_HBA1C_VALUE = ATTR_VALUE
-ATTR_KETONE_VALUE = ATTR_VALUE
 
 
 class PetType(StrEnum):

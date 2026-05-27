@@ -25,9 +25,7 @@ from .const import (
     ATTR_DOSAGE,
     ATTR_FOOD_TYPE,
     ATTR_GIVEN_AT,
-    ATTR_GLUCOSE_VALUE,
-    ATTR_HBA1C_VALUE,
-    ATTR_KETONE_VALUE,
+    ATTR_VALUE,
     ATTR_LEVEL,
     ATTR_LOGGED_AT,
     ATTR_MEASUREMENT_LOCATION,
@@ -280,7 +278,7 @@ SERVICE_LOG_GENERIC_SCHEMA = vol.Schema(
 SERVICE_LOG_BLOOD_GLUCOSE_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
-        vol.Required(ATTR_GLUCOSE_VALUE): vol.All(
+        vol.Required(ATTR_VALUE): vol.All(
             vol.Coerce(float), vol.Range(min=0.1, max=100.0)
         ),
         vol.Optional(ATTR_MONITOR_TYPE, default="pet_monitor"): vol.In(
@@ -298,7 +296,7 @@ SERVICE_LOG_BLOOD_GLUCOSE_SCHEMA = vol.Schema(
 SERVICE_LOG_GLYCATED_HEMOGLOBIN_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
-        vol.Required(ATTR_HBA1C_VALUE): vol.All(
+        vol.Required(ATTR_VALUE): vol.All(
             vol.Coerce(float), vol.Range(min=0.1, max=30.0)
         ),
         vol.Optional(ATTR_MEASUREMENT_LOCATION, default="vet"): vol.In(
@@ -313,7 +311,7 @@ SERVICE_LOG_GLYCATED_HEMOGLOBIN_SCHEMA = vol.Schema(
 SERVICE_LOG_KETONES_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
-        vol.Required(ATTR_KETONE_VALUE): vol.All(
+        vol.Required(ATTR_VALUE): vol.All(
             vol.Coerce(float), vol.Range(min=0.0, max=100.0)
         ),
         vol.Optional(ATTR_SAMPLE_TYPE, default="urine"): vol.In(
@@ -1131,7 +1129,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         record = BloodGlucoseRecord(
             timestamp=logged_at,
             pet_id=pet_data.pet_id,
-            value=call.data[ATTR_GLUCOSE_VALUE],
+            value=call.data[ATTR_VALUE],
             monitor_type=GlucoseMonitorType(
                 call.data.get(ATTR_MONITOR_TYPE, "pet_monitor")
             ),
@@ -1184,7 +1182,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         record = GlycatedHemoglobinRecord(
             timestamp=logged_at,
             pet_id=pet_data.pet_id,
-            value=call.data[ATTR_HBA1C_VALUE],
+            value=call.data[ATTR_VALUE],
             measurement_location=MeasurementLocation(
                 call.data.get(ATTR_MEASUREMENT_LOCATION, "vet")
             ),
@@ -1234,7 +1232,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         record = KetoneRecord(
             timestamp=logged_at,
             pet_id=pet_data.pet_id,
-            value=call.data[ATTR_KETONE_VALUE],
+            value=call.data[ATTR_VALUE],
             sample_type=KetoneSampleType(
                 call.data.get(ATTR_SAMPLE_TYPE, "urine")
             ),
