@@ -14,7 +14,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_MEDICATIONS, DOMAIN
+from .const import CONF_GENERIC_LOG_CATEGORIES, CONF_MEDICATIONS, DOMAIN
 from .models import BathroomVisit, MedicationRecord, PetHealthConfigEntry
 from .store import PetHealthStore
 
@@ -56,6 +56,25 @@ async def async_setup_entry(
         # Wellbeing sensors
         LastWellbeingAssessmentSensor(entry, store, pet_data.pet_id),
         CurrentWellbeingScoreSensor(entry, store, pet_data.pet_id),
+        # Weight sensors
+        LastWeightTimestampSensor(entry, store, pet_data.pet_id),
+        CurrentWeightSensor(entry, store, pet_data.pet_id),
+        WeightChange7DSensor(entry, store, pet_data.pet_id),
+        WeightChange30DSensor(entry, store, pet_data.pet_id),
+        # Vomit sensors
+        LastVomitTimestampSensor(entry, store, pet_data.pet_id),
+        LastVomitTypeSensor(entry, store, pet_data.pet_id),
+        DailyVomitCountSensor(entry, store, pet_data.pet_id),
+        WeeklyVomitCountSensor(entry, store, pet_data.pet_id),
+        # Blood glucose sensors
+        LastBloodGlucoseTimestampSensor(entry, store, pet_data.pet_id),
+        CurrentBloodGlucoseSensor(entry, store, pet_data.pet_id),
+        # Glycated hemoglobin sensors
+        LastGlycatedHemoglobinTimestampSensor(entry, store, pet_data.pet_id),
+        CurrentGlycatedHemoglobinSensor(entry, store, pet_data.pet_id),
+        # Ketone sensors
+        LastKetoneTimestampSensor(entry, store, pet_data.pet_id),
+        CurrentKetoneValueSensor(entry, store, pet_data.pet_id),
     ]
 
     # Add medication sensors for each configured medication
@@ -70,6 +89,22 @@ async def async_setup_entry(
                 ),
                 DailyMedicationCountSensor(
                     entry, store, pet_data.pet_id, med_id, med_name
+                ),
+            ]
+        )
+
+    # Add generic log sensors for each configured category
+    categories = entry.options.get(CONF_GENERIC_LOG_CATEGORIES, [])
+    for category in categories:
+        cat_id = category["category_id"]
+        cat_name = category["category_name"]
+        sensors.extend(
+            [
+                LastGenericLogTimestampSensor(
+                    entry, store, pet_data.pet_id, cat_id, cat_name
+                ),
+                DailyGenericLogCountSensor(
+                    entry, store, pet_data.pet_id, cat_id, cat_name
                 ),
             ]
         )
@@ -1172,13 +1207,309 @@ class WeeklyVomitCountSensor(PetHealthSensorBase):
 
         count = sum(1 for record in records if record.timestamp >= week_ago)
         self._attr_native_value = count
-        self._attr_unique_id = f"{pet_id}_current_wellbeing_score"
+
+
+# Blood Glucose Sensors
+
+
+class LastBloodGlucoseTimestampSensor(PetHealthSensorBase):
+    """Sensor showing the timestamp of the last blood glucose measurement."""
+
+    _attr_translation_key = "last_blood_glucose"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_last_blood_glucose"
 
     def _update_from_store(self) -> None:
         """Update the sensor value."""
-        records = self._store.get_wellbeing_records(self._pet_id)
+        records = self._store.get_blood_glucose_records(self._pet_id)
         if records:
             last_record = records[-1]
-            self._attr_native_value = last_record.wellbeing_score
+            timestamp = last_record.timestamp
+            if timestamp.tzinfo is None:
+                timestamp = dt_util.as_utc(timestamp)
+            self._attr_native_value = timestamp
+            self._attr_extra_state_attributes = {
+                **self._attr_extra_state_attributes,
+                "value": last_record.value,
+                "monitor_type": last_record.monitor_type,
+                "measurement_location": last_record.measurement_location,
+                "notes": last_record.notes,
+            }
         else:
             self._attr_native_value = None
+            self._attr_extra_state_attributes = {
+                "pet": self._pet_data.name,
+                "integration": DOMAIN,
+            }
+
+
+class CurrentBloodGlucoseSensor(PetHealthSensorBase):
+    """Sensor showing the current blood glucose value in mmol/L."""
+
+    _attr_translation_key = "current_blood_glucose"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = "mmol/L"
+    _attr_icon = "mdi:diabetes"
+    _attr_suggested_display_precision = 1
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_current_blood_glucose"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_blood_glucose_records(self._pet_id)
+        if records:
+            last_record = records[-1]
+            self._attr_native_value = last_record.value
+            self._attr_extra_state_attributes = {
+                **self._attr_extra_state_attributes,
+                "monitor_type": last_record.monitor_type,
+                "measurement_location": last_record.measurement_location,
+            }
+        else:
+            self._attr_native_value = None
+
+
+# Glycated Hemoglobin Sensors
+
+
+class LastGlycatedHemoglobinTimestampSensor(PetHealthSensorBase):
+    """Sensor showing the timestamp of the last glycated hemoglobin (HbA1c) measurement."""
+
+    _attr_translation_key = "last_glycated_hemoglobin"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_last_glycated_hemoglobin"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_glycated_hemoglobin_records(self._pet_id)
+        if records:
+            last_record = records[-1]
+            timestamp = last_record.timestamp
+            if timestamp.tzinfo is None:
+                timestamp = dt_util.as_utc(timestamp)
+            self._attr_native_value = timestamp
+            self._attr_extra_state_attributes = {
+                **self._attr_extra_state_attributes,
+                "value": last_record.value,
+                "measurement_location": last_record.measurement_location,
+                "notes": last_record.notes,
+            }
+        else:
+            self._attr_native_value = None
+            self._attr_extra_state_attributes = {
+                "pet": self._pet_data.name,
+                "integration": DOMAIN,
+            }
+
+
+class CurrentGlycatedHemoglobinSensor(PetHealthSensorBase):
+    """Sensor showing the current glycated hemoglobin (HbA1c) value in percent."""
+
+    _attr_translation_key = "current_glycated_hemoglobin"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = "%"
+    _attr_icon = "mdi:test-tube"
+    _attr_suggested_display_precision = 1
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_current_glycated_hemoglobin"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_glycated_hemoglobin_records(self._pet_id)
+        if records:
+            last_record = records[-1]
+            self._attr_native_value = last_record.value
+            self._attr_extra_state_attributes = {
+                **self._attr_extra_state_attributes,
+                "measurement_location": last_record.measurement_location,
+            }
+        else:
+            self._attr_native_value = None
+
+
+# Ketone Sensors
+
+
+class LastKetoneTimestampSensor(PetHealthSensorBase):
+    """Sensor showing the timestamp of the last ketone measurement."""
+
+    _attr_translation_key = "last_ketone"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_last_ketone"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_ketone_records(self._pet_id)
+        if records:
+            last_record = records[-1]
+            timestamp = last_record.timestamp
+            if timestamp.tzinfo is None:
+                timestamp = dt_util.as_utc(timestamp)
+            self._attr_native_value = timestamp
+            self._attr_extra_state_attributes = {
+                **self._attr_extra_state_attributes,
+                "value": last_record.value,
+                "sample_type": last_record.sample_type,
+                "measurement_location": last_record.measurement_location,
+                "notes": last_record.notes,
+            }
+        else:
+            self._attr_native_value = None
+            self._attr_extra_state_attributes = {
+                "pet": self._pet_data.name,
+                "integration": DOMAIN,
+            }
+
+
+class CurrentKetoneValueSensor(PetHealthSensorBase):
+    """Sensor showing the current ketone value in mmol/L."""
+
+    _attr_translation_key = "current_ketone_value"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = "mmol/L"
+    _attr_icon = "mdi:flask"
+    _attr_suggested_display_precision = 1
+
+    def __init__(
+        self, entry: PetHealthConfigEntry, store: PetHealthStore, pet_id: str
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._attr_unique_id = f"{pet_id}_current_ketone_value"
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        records = self._store.get_ketone_records(self._pet_id)
+        if records:
+            last_record = records[-1]
+            self._attr_native_value = last_record.value
+            self._attr_extra_state_attributes = {
+                **self._attr_extra_state_attributes,
+                "sample_type": last_record.sample_type,
+                "measurement_location": last_record.measurement_location,
+            }
+        else:
+            self._attr_native_value = None
+
+
+# Generic Log Sensors (per category)
+
+
+class LastGenericLogTimestampSensor(PetHealthSensorBase):
+    """Sensor showing the timestamp of the last generic log entry for a category."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self,
+        entry: PetHealthConfigEntry,
+        store: PetHealthStore,
+        pet_id: str,
+        category_id: str,
+        category_name: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._category_id = category_id
+        self._category_name = category_name
+        self._attr_unique_id = f"{pet_id}_generic_log_{category_id}_last_entry"
+        self._attr_translation_key = "last_generic_log"
+        self._attr_translation_placeholders = {
+            "category_name": category_name,
+        }
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        logs = self._store.get_generic_logs(self._pet_id)
+        category_logs = [log for log in logs if log.category == self._category_name]
+        if category_logs:
+            last_log = category_logs[-1]
+            timestamp = last_log.timestamp
+            if timestamp.tzinfo is None:
+                timestamp = dt_util.as_utc(timestamp)
+            self._attr_native_value = timestamp
+            self._attr_extra_state_attributes = {
+                **self._attr_extra_state_attributes,
+                "category": last_log.category,
+                "notes": last_log.notes,
+                "log_id": last_log.log_id,
+            }
+        else:
+            self._attr_native_value = None
+            self._attr_extra_state_attributes = {
+                "pet": self._pet_data.name,
+                "integration": DOMAIN,
+                "category": self._category_name,
+            }
+
+
+class DailyGenericLogCountSensor(PetHealthSensorBase):
+    """Sensor counting generic log entries for a category today."""
+
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = "entries"
+    _attr_icon = "mdi:text-box-multiple"
+
+    def __init__(
+        self,
+        entry: PetHealthConfigEntry,
+        store: PetHealthStore,
+        pet_id: str,
+        category_id: str,
+        category_name: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(entry, store, pet_id)
+        self._category_id = category_id
+        self._category_name = category_name
+        self._attr_unique_id = f"{pet_id}_generic_log_{category_id}_daily_count"
+        self._attr_translation_key = "daily_generic_log_count"
+        self._attr_translation_placeholders = {
+            "category_name": category_name,
+        }
+
+    def _update_from_store(self) -> None:
+        """Update the sensor value."""
+        logs = self._store.get_generic_logs(self._pet_id)
+        now = dt_util.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        category_logs_today = [
+            log
+            for log in logs
+            if log.category == self._category_name
+            and (
+                dt_util.as_utc(log.timestamp)
+                if log.timestamp.tzinfo is None
+                else log.timestamp
+            )
+            >= today_start
+        ]
+        self._attr_native_value = len(category_logs_today)
