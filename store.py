@@ -468,6 +468,32 @@ class PetHealthStore:
         # Notify callbacks to update sensors immediately
         self._notify_callbacks(log.pet_id)
 
+    async def async_update_generic_log_category(
+        self, pet_id: str, category_id: str, old_name: str, new_name: str
+    ) -> None:
+        """Update stored generic log category metadata after a category rename."""
+        logs = self._generic_logs_data.get(pet_id, [])
+        updated = False
+
+        for log in logs:
+            if log.category_id == category_id or (
+                log.category_id is None and log.category == old_name
+            ):
+                if log.category != new_name or log.category_id != category_id:
+                    log.category = new_name
+                    log.category_id = category_id
+                    updated = True
+
+        if not updated:
+            return
+
+        store_data = {
+            current_pet_id: [entry.to_dict() for entry in entries]
+            for current_pet_id, entries in self._generic_logs_data.items()
+        }
+        await self._generic_logs_store.async_save(store_data)
+        self._notify_callbacks(pet_id)
+
     def get_generic_logs(self, pet_id: str) -> list[GenericLog]:
         """Get all generic logs for a pet."""
         return self._generic_logs_data.get(pet_id, [])

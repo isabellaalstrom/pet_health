@@ -45,6 +45,7 @@ from .const import (
     ATTR_VOMIT_TYPE,
     ATTR_WEIGHT_GRAMS,
     ATTR_WELLBEING_SCORE,
+    CONF_CATEGORY_ID,
     CONF_CATEGORY_NAME,
     CONF_GENERIC_LOG_CATEGORIES,
     CONF_MEDICATION_DOSAGE,
@@ -1214,15 +1215,16 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         # Validate category exists in configured categories
         category = call.data[ATTR_CATEGORY]
         configured_categories = entry.options.get(CONF_GENERIC_LOG_CATEGORIES, [])
-        
-        # Build a set of valid category names (case-sensitive)
-        valid_categories = {
-            cat.get(CONF_CATEGORY_NAME) 
-            for cat in configured_categories 
-            if cat.get(CONF_CATEGORY_NAME)
-        }
-        
-        if category not in valid_categories:
+        category_config = next(
+            (
+                cat
+                for cat in configured_categories
+                if cat.get(CONF_CATEGORY_NAME) == category
+            ),
+            None,
+        )
+
+        if category_config is None:
             raise HomeAssistantError(
                 f"Category '{category}' is not configured for pet '{pet_data.name}'. "
                 f"Please add it in Settings → Devices & Services → Pet Health → "
@@ -1242,6 +1244,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             pet_id=pet_data.pet_id,
             category=category,
             notes=call.data[ATTR_NOTES],
+            category_id=category_config.get(CONF_CATEGORY_ID),
         )
 
         await store.async_save_generic_log(log)

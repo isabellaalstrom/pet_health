@@ -19,6 +19,26 @@ from .models import BathroomVisit, MedicationRecord, PetHealthConfigEntry
 from .store import PetHealthStore
 
 
+def _sort_timestamp(timestamp: datetime) -> datetime:
+    """Return a timezone-aware timestamp for comparisons."""
+    return dt_util.as_utc(timestamp) if timestamp.tzinfo is None else timestamp
+
+
+def _latest_record(records: list) -> object:
+    """Return the newest record by timestamp."""
+    return max(records, key=lambda record: _sort_timestamp(record.timestamp))
+
+
+def _matches_generic_log_category(
+    category_id: str, category_name: str, category_log: object
+) -> bool:
+    """Return whether a generic log belongs to the configured category."""
+    return getattr(category_log, "category_id", None) == category_id or (
+        getattr(category_log, "category_id", None) is None
+        and category_log.category == category_name
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: PetHealthConfigEntry,
@@ -1229,7 +1249,7 @@ class LastBloodGlucoseTimestampSensor(PetHealthSensorBase):
         """Update the sensor value."""
         records = self._store.get_blood_glucose_records(self._pet_id)
         if records:
-            last_record = records[-1]
+            last_record = _latest_record(records)
             timestamp = last_record.timestamp
             if timestamp.tzinfo is None:
                 timestamp = dt_util.as_utc(timestamp)
@@ -1269,7 +1289,7 @@ class CurrentBloodGlucoseSensor(PetHealthSensorBase):
         """Update the sensor value."""
         records = self._store.get_blood_glucose_records(self._pet_id)
         if records:
-            last_record = records[-1]
+            last_record = _latest_record(records)
             self._attr_native_value = last_record.value
             self._attr_extra_state_attributes = {
                 **self._attr_extra_state_attributes,
@@ -1300,7 +1320,7 @@ class LastGlycatedHemoglobinTimestampSensor(PetHealthSensorBase):
         """Update the sensor value."""
         records = self._store.get_glycated_hemoglobin_records(self._pet_id)
         if records:
-            last_record = records[-1]
+            last_record = _latest_record(records)
             timestamp = last_record.timestamp
             if timestamp.tzinfo is None:
                 timestamp = dt_util.as_utc(timestamp)
@@ -1339,7 +1359,7 @@ class CurrentGlycatedHemoglobinSensor(PetHealthSensorBase):
         """Update the sensor value."""
         records = self._store.get_glycated_hemoglobin_records(self._pet_id)
         if records:
-            last_record = records[-1]
+            last_record = _latest_record(records)
             self._attr_native_value = last_record.value
             self._attr_extra_state_attributes = {
                 **self._attr_extra_state_attributes,
@@ -1369,7 +1389,7 @@ class LastKetoneTimestampSensor(PetHealthSensorBase):
         """Update the sensor value."""
         records = self._store.get_ketone_records(self._pet_id)
         if records:
-            last_record = records[-1]
+            last_record = _latest_record(records)
             timestamp = last_record.timestamp
             if timestamp.tzinfo is None:
                 timestamp = dt_util.as_utc(timestamp)
@@ -1409,7 +1429,7 @@ class CurrentKetoneValueSensor(PetHealthSensorBase):
         """Update the sensor value."""
         records = self._store.get_ketone_records(self._pet_id)
         if records:
-            last_record = records[-1]
+            last_record = _latest_record(records)
             self._attr_native_value = last_record.value
             self._attr_extra_state_attributes = {
                 **self._attr_extra_state_attributes,
@@ -1449,9 +1469,15 @@ class LastGenericLogTimestampSensor(PetHealthSensorBase):
     def _update_from_store(self) -> None:
         """Update the sensor value."""
         logs = self._store.get_generic_logs(self._pet_id)
-        category_logs = [log for log in logs if log.category == self._category_name]
+        category_logs = [
+            log
+            for log in logs
+            if _matches_generic_log_category(
+                self._category_id, self._category_name, log
+            )
+        ]
         if category_logs:
-            last_log = category_logs[-1]
+            last_log = _latest_record(category_logs)
             timestamp = last_log.timestamp
             if timestamp.tzinfo is None:
                 timestamp = dt_util.as_utc(timestamp)
@@ -1504,7 +1530,9 @@ class DailyGenericLogCountSensor(PetHealthSensorBase):
         category_logs_today = [
             log
             for log in logs
-            if log.category == self._category_name
+            if _matches_generic_log_category(
+                self._category_id, self._category_name, log
+            )
             and (
                 dt_util.as_utc(log.timestamp)
                 if log.timestamp.tzinfo is None
