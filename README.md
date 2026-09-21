@@ -98,6 +98,22 @@ The integration also creates additional sensors to help monitor hydration, food,
   - `sensor.<pet>_last_vomit_type` — type of last vomit (hairball/food/bile/...)
   - `sensor.<pet>_daily_vomit_count` / `sensor.<pet>_weekly_vomit_count`
 
+- Blood glucose:
+  - `sensor.<pet>_last_blood_glucose` — timestamp of last blood glucose measurement
+  - `sensor.<pet>_current_blood_glucose` — most recent blood glucose value (mmol/L)
+
+- Glycated hemoglobin (HbA1c):
+  - `sensor.<pet>_last_glycated_hemoglobin` — timestamp of last HbA1c measurement
+  - `sensor.<pet>_current_glycated_hemoglobin` — most recent HbA1c value (%)
+
+- Ketones:
+  - `sensor.<pet>_last_ketone` — timestamp of last ketone measurement
+  - `sensor.<pet>_current_ketone_value` — most recent ketone value (mmol/L)
+
+- Generic log sensors (created per configured category in options):
+  - `sensor.<pet>_generic_log_<category_id>_last_entry` — timestamp of last log in this category
+  - `sensor.<pet>_generic_log_<category_id>_daily_count` — number of log entries today for this category
+
 - Administrative / review:
   - `sensor.<pet>_unconfirmed_visits_count` — number of unconfirmed AI/automatic visits
 

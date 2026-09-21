@@ -362,6 +362,7 @@ class GenericLog:
     pet_id: str
     category: str
     notes: str
+    category_id: str | None = None
     log_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def to_dict(self) -> dict:
@@ -372,6 +373,7 @@ class GenericLog:
             "pet_id": self.pet_id,
             "category": self.category,
             "notes": self.notes,
+            "category_id": self.category_id,
         }
 
     @staticmethod
@@ -382,6 +384,7 @@ class GenericLog:
             pet_id=data["pet_id"],
             category=data["category"],
             notes=data["notes"],
+            category_id=data.get("category_id"),
             log_id=data.get("log_id", str(uuid.uuid4())),
         )
 

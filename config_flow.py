@@ -568,13 +568,24 @@ class PetHealthOptionsFlow(OptionsFlow):
                 errors[CONF_CATEGORY_NAME] = "empty_name"
             else:
                 categories = list(self.config_entry.options.get(CONF_GENERIC_LOG_CATEGORIES, []))
+                new_name = user_input[CONF_CATEGORY_NAME].strip()
+                old_name = new_name
                 for i, cat in enumerate(categories):
                     if cat[CONF_CATEGORY_ID] == self._category_id:
+                        old_name = cat[CONF_CATEGORY_NAME]
                         categories[i] = {
                             CONF_CATEGORY_ID: self._category_id,
-                            CONF_CATEGORY_NAME: user_input[CONF_CATEGORY_NAME].strip(),
+                            CONF_CATEGORY_NAME: new_name,
                         }
                         break
+
+                if old_name != new_name:
+                    await self.hass.data[DOMAIN]["store"].async_update_generic_log_category(
+                        self.config_entry.data[CONF_PET_ID],
+                        self._category_id,
+                        old_name,
+                        new_name,
+                    )
 
                 return self.async_create_entry(
                     title="",
