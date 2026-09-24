@@ -55,7 +55,7 @@ Note: If you plan to publish this or use HACS, follow HACS packaging guidelines.
 ## Configuration
 
 - Setup is available through the Integrations UI (config flow).
-- Per-pet options include configuring medications (name + id) so medication-related sensors will be created automatically.
+- Per-pet options include configuring medications (name + id) and enabling/disabling bathroom visit tracking for each pet.
 
 There is no required YAML — use the UI to add your pets and configure options.
 

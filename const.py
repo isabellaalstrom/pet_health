@@ -19,6 +19,7 @@ CONF_PET_IMAGE_PATH = "pet_image_path"
 # Options keys
 CONF_MEDICATIONS = "medications"
 CONF_GENERIC_LOG_CATEGORIES = "generic_log_categories"
+CONF_ENABLE_BATHROOM_VISITS = "enable_bathroom_visits"
 
 # Medication config keys
 CONF_MEDICATION_ID = "medication_id"
@@ -34,6 +35,14 @@ CONF_MEDICATION_NOTES = "notes"
 # Generic log category config keys
 CONF_CATEGORY_ID = "category_id"
 CONF_CATEGORY_NAME = "category_name"
+
+# Built-in generic log categories, always available even if not configured
+DEFAULT_GENERIC_LOG_CATEGORIES = [
+    {
+        CONF_CATEGORY_ID: "tick_prevention",
+        CONF_CATEGORY_NAME: "Tick prevention",
+    }
+]
 
 # Storage
 STORAGE_VERSION = 1
@@ -164,6 +173,8 @@ class MedicationFrequency(StrEnum):
     EVERY_8_HOURS = "every_8_hours"
     EVERY_12_HOURS = "every_12_hours"
     WEEKLY = "weekly"
+    YEARLY = "yearly"
+    EVERY_THREE_YEARS = "every_three_years"
 
 
 class ConsumptionAmount(StrEnum):

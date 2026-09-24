@@ -49,6 +49,7 @@ from .const import (
     CONF_CATEGORY_NAME,
     CONF_GENERIC_LOG_CATEGORIES,
     CONF_MEDICATION_DOSAGE,
+    CONF_MEDICATION_FREQUENCY,
     CONF_MEDICATION_ID,
     CONF_MEDICATION_NAME,
     CONF_MEDICATION_UNIT,
@@ -56,6 +57,7 @@ from .const import (
     CONF_PET_ID,
     CONF_PET_NAME,
     CONF_PET_TYPE,
+    DEFAULT_GENERIC_LOG_CATEGORIES,
     DOMAIN,
     EVENT_PET_HEALTH_DATA_UPDATED,
     SERVICE_AMEND_VISIT,
@@ -522,6 +524,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             medication_name=medication_config[CONF_MEDICATION_NAME],
             dosage=call.data.get(ATTR_DOSAGE) or medication_config.get(CONF_MEDICATION_DOSAGE),
             unit=call.data.get(ATTR_UNIT) or medication_config.get(CONF_MEDICATION_UNIT),
+            frequency=medication_config.get(CONF_MEDICATION_FREQUENCY),
             reason=None,  # Not storing reason per dose
             notes=call.data.get(ATTR_NOTES),
         )
@@ -1218,7 +1221,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         category_config = next(
             (
                 cat
-                for cat in configured_categories
+                for cat in [*configured_categories, *DEFAULT_GENERIC_LOG_CATEGORIES]
                 if cat.get(CONF_CATEGORY_NAME) == category
             ),
             None,
