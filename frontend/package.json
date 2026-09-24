@@ -1,6 +1,6 @@
 {
   "name": "pet-health-panel",
-  "version": "v0.20.0-beta",
+  "version": "0.20.0-beta",
   "type": "module",
   "private": true,
   "scripts": {
