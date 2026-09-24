@@ -1035,7 +1035,11 @@ function App({ hass }: AppProps) {
     try {
       const loggedAt = vetVisitFormData.timestamp ? new Date(vetVisitFormData.timestamp).toISOString() : undefined;
       const weightKg = vetVisitFormData.weight_kg ? parseFloat(vetVisitFormData.weight_kg) : undefined;
-      const weightGrams = weightKg !== undefined && weightKg > 0 ? Math.round(weightKg * 1000) : undefined;
+      if (weightKg !== undefined && (!Number.isFinite(weightKg) || weightKg < 0.1 || weightKg > 50)) {
+        alert('Please enter a valid weight between 0.1 and 50 kg');
+        return;
+      }
+      const weightGrams = weightKg !== undefined ? Math.round(weightKg * 1000) : undefined;
       await api.logVetVisit(selectedPetId, vetVisitFormData.notes, weightGrams, loggedAt);
       setShowVetVisitDialog(false);
       setVetVisitFormData({ notes: '', weight_kg: '', timestamp: '' });
