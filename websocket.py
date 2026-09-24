@@ -234,20 +234,8 @@ async def handle_get_store_dump(
         if pid:
             pet_ids.add(pid)
 
-    # include any pets that have data in store stores
-    pet_ids.update(getattr(store, "_visits_data", {}).keys())
-    pet_ids.update(getattr(store, "_medications_data", {}).keys())
-    pet_ids.update(getattr(store, "_drinks_data", {}).keys())
-    pet_ids.update(getattr(store, "_meals_data", {}).keys())
-    pet_ids.update(getattr(store, "_thirst_levels_data", {}).keys())
-    pet_ids.update(getattr(store, "_appetite_levels_data", {}).keys())
-    pet_ids.update(getattr(store, "_wellbeing_data", {}).keys())
-    pet_ids.update(getattr(store, "_weight_data", {}).keys())
-    pet_ids.update(getattr(store, "_vomit_data", {}).keys())
-    pet_ids.update(getattr(store, "_generic_logs_data", {}).keys())
-    pet_ids.update(getattr(store, "_blood_glucose_data", {}).keys())
-    pet_ids.update(getattr(store, "_glycated_hemoglobin_data", {}).keys())
-    pet_ids.update(getattr(store, "_ketones_data", {}).keys())
+    # include any pets that have data in the store
+    pet_ids.update(store.known_pet_ids())
 
     if requested_pet:
         pet_ids = {requested_pet}
