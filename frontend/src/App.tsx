@@ -1028,7 +1028,7 @@ function App({ hass }: AppProps) {
 
   const submitLogVetVisit = async () => {
     if (!api || !selectedPetId) return;
-    if (!vetVisitFormData.notes) {
+    if (!vetVisitFormData.notes.trim()) {
       alert('Please enter notes about the vet visit');
       return;
     }
