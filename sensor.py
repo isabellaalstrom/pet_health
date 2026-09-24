@@ -19,14 +19,23 @@ from .models import BathroomVisit, MedicationRecord, PetHealthConfigEntry
 from .store import PetHealthStore
 
 
-def _sort_timestamp(timestamp: datetime) -> datetime:
-    """Return a timezone-aware timestamp for comparisons."""
-    return dt_util.as_utc(timestamp) if timestamp.tzinfo is None else timestamp
+def _ensure_aware(record: object) -> datetime:
+    """Return `record.timestamp` as a timezone-aware datetime.
+
+    Old data can be stored without a timezone. Rather than re-checking and
+    re-converting on every read (every sensor, every minute, forever), the
+    record is normalized in place the first time it's seen so later reads
+    of the same object skip the conversion entirely.
+    """
+    timestamp = record.timestamp
+    if timestamp.tzinfo is None:
+        record.timestamp = dt_util.as_utc(timestamp)
+    return record.timestamp
 
 
 def _latest_record(records: list) -> object:
     """Return the newest record by timestamp."""
-    return max(records, key=lambda record: _sort_timestamp(record.timestamp))
+    return max(records, key=_ensure_aware)
 
 
 def _matches_generic_log_category(
@@ -147,7 +156,6 @@ class PetHealthSensorBase(SensorEntity):
         self._pet_id = pet_id
         self._pet_data = entry.runtime_data
         self._attr_device_info = self._pet_data.device_info()
-        self._remove_update_tracker = None
         # Common attributes for all pet health sensors
         self._attr_extra_state_attributes = {
             "pet": self._pet_data.name,
@@ -156,10 +164,8 @@ class PetHealthSensorBase(SensorEntity):
 
     async def async_added_to_hass(self) -> None:
         """Register callbacks when entity is added."""
-        # Update every minute to refresh time-based sensors
-        self._remove_update_tracker = async_track_time_interval(
-            self.hass, self._async_update, timedelta(minutes=1)
-        )
+        # Share one per-minute refresh timer across all sensors of this pet
+        self._register_pet_timer()
         # Listen for storage updates
         self._store.register_update_callback(self._pet_id, self._async_update)
         # Initial update
@@ -167,9 +173,40 @@ class PetHealthSensorBase(SensorEntity):
 
     async def async_will_remove_from_hass(self) -> None:
         """Clean up when entity is removed."""
-        if self._remove_update_tracker:
-            self._remove_update_tracker()
+        self._unregister_pet_timer()
         self._store.unregister_update_callback(self._pet_id, self._async_update)
+
+    def _register_pet_timer(self) -> None:
+        """Share a single per-minute refresh timer across a pet's sensors.
+
+        A pet can have dozens of sensor entities. Giving each one its own
+        `async_track_time_interval` means every minute-tick fans out into
+        dozens of independent, identical timers. A single refcounted timer
+        per pet_id gives every sensor the same per-minute refresh with far
+        fewer scheduled callbacks.
+        """
+        timers = self.hass.data[DOMAIN].setdefault("pet_timers", {})
+        timer = timers.get(self._pet_id)
+        if timer is None:
+            remove = async_track_time_interval(
+                self.hass,
+                lambda _now: self._store.refresh_pet(self._pet_id),
+                timedelta(minutes=1),
+            )
+            timers[self._pet_id] = {"remove": remove, "refcount": 1}
+        else:
+            timer["refcount"] += 1
+
+    def _unregister_pet_timer(self) -> None:
+        """Release this sensor's share of the per-pet refresh timer."""
+        timers = self.hass.data[DOMAIN].get("pet_timers", {})
+        timer = timers.get(self._pet_id)
+        if timer is None:
+            return
+        timer["refcount"] -= 1
+        if timer["refcount"] <= 0:
+            timer["remove"]()
+            del timers[self._pet_id]
 
     @callback
     def _async_update(self, _=None) -> None:
@@ -188,19 +225,8 @@ class PetHealthSensorBase(SensorEntity):
 
     def _get_visits_since(self, since: datetime) -> list[BathroomVisit]:
         """Get visits since a given time."""
-        visits = self._get_visits()
-        # Ensure both timestamps are timezone-aware for comparison
         since_aware = dt_util.as_utc(since) if since.tzinfo is None else since
-        return [
-            v
-            for v in visits
-            if (
-                dt_util.as_utc(v.timestamp)
-                if v.timestamp.tzinfo is None
-                else v.timestamp
-            )
-            >= since_aware
-        ]
+        return [v for v in self._get_visits() if _ensure_aware(v) >= since_aware]
 
     def _get_medications(self) -> list[MedicationRecord]:
         """Get all medication records for this pet."""
@@ -208,18 +234,9 @@ class PetHealthSensorBase(SensorEntity):
 
     def _get_medications_since(self, since: datetime) -> list[MedicationRecord]:
         """Get medication records since a given time."""
-        medications = self._get_medications()
-        # Ensure both timestamps are timezone-aware for comparison
         since_aware = dt_util.as_utc(since) if since.tzinfo is None else since
         return [
-            m
-            for m in medications
-            if (
-                dt_util.as_utc(m.timestamp)
-                if m.timestamp.tzinfo is None
-                else m.timestamp
-            )
-            >= since_aware
+            m for m in self._get_medications() if _ensure_aware(m) >= since_aware
         ]
 
 
@@ -241,11 +258,7 @@ class LastVisitTimestampSensor(PetHealthSensorBase):
         visits = self._get_visits()
         if visits:
             last_visit = visits[-1]
-            # Ensure timestamp is timezone-aware
-            timestamp = last_visit.timestamp
-            if timestamp.tzinfo is None:
-                timestamp = dt_util.as_utc(timestamp)
-            self._attr_native_value = timestamp
+            self._attr_native_value = _ensure_aware(last_visit)
             # Merge with base attributes (pet, integration)
             self._attr_extra_state_attributes = {
                 **self._attr_extra_state_attributes,  # Base attributes (pet, integration)
@@ -334,13 +347,7 @@ class HoursSinceLastVisitSensor(PetHealthSensorBase):
         visits = self._get_visits()
         if visits:
             last_visit = visits[-1]
-            # Ensure both timestamps are timezone-aware
-            last_timestamp = (
-                dt_util.as_utc(last_visit.timestamp)
-                if last_visit.timestamp.tzinfo is None
-                else last_visit.timestamp
-            )
-            time_diff = dt_util.now() - last_timestamp
+            time_diff = dt_util.now() - _ensure_aware(last_visit)
             self._attr_native_value = time_diff.total_seconds() / 3600
         else:
             self._attr_native_value = None
@@ -637,10 +644,7 @@ class LastDrinkTimestampSensor(PetHealthSensorBase):
         records = self._store.get_drink_records(self._pet_id)
         if records:
             last_record = records[-1]
-            timestamp = last_record.timestamp
-            if timestamp.tzinfo is None:
-                timestamp = dt_util.as_utc(timestamp)
-            self._attr_native_value = timestamp
+            self._attr_native_value = _ensure_aware(last_record)
             self._attr_extra_state_attributes = {
                 **self._attr_extra_state_attributes,
                 "amount": last_record.amount,
@@ -674,16 +678,7 @@ class DailyDrinkCountSensor(PetHealthSensorBase):
         records = self._store.get_drink_records(self._pet_id)
         now = dt_util.now()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        drinks_today = [
-            r
-            for r in records
-            if (
-                dt_util.as_utc(r.timestamp)
-                if r.timestamp.tzinfo is None
-                else r.timestamp
-            )
-            >= today_start
-        ]
+        drinks_today = [r for r in records if _ensure_aware(r) >= today_start]
         self._attr_native_value = len(drinks_today)
 
 
@@ -731,10 +726,7 @@ class LastMealTimestampSensor(PetHealthSensorBase):
         records = self._store.get_meal_records(self._pet_id)
         if records:
             last_record = records[-1]
-            timestamp = last_record.timestamp
-            if timestamp.tzinfo is None:
-                timestamp = dt_util.as_utc(timestamp)
-            self._attr_native_value = timestamp
+            self._attr_native_value = _ensure_aware(last_record)
             self._attr_extra_state_attributes = {
                 **self._attr_extra_state_attributes,
                 "amount": last_record.amount,
@@ -769,16 +761,7 @@ class DailyMealCountSensor(PetHealthSensorBase):
         records = self._store.get_meal_records(self._pet_id)
         now = dt_util.now()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        meals_today = [
-            r
-            for r in records
-            if (
-                dt_util.as_utc(r.timestamp)
-                if r.timestamp.tzinfo is None
-                else r.timestamp
-            )
-            >= today_start
-        ]
+        meals_today = [r for r in records if _ensure_aware(r) >= today_start]
         self._attr_native_value = len(meals_today)
 
 
@@ -826,10 +809,7 @@ class LastWellbeingAssessmentSensor(PetHealthSensorBase):
         records = self._store.get_wellbeing_records(self._pet_id)
         if records:
             last_record = records[-1]
-            timestamp = last_record.timestamp
-            if timestamp.tzinfo is None:
-                timestamp = dt_util.as_utc(timestamp)
-            self._attr_native_value = timestamp
+            self._attr_native_value = _ensure_aware(last_record)
             self._attr_extra_state_attributes = {
                 **self._attr_extra_state_attributes,
                 "wellbeing_score": last_record.wellbeing_score,
@@ -888,10 +868,7 @@ class LastThirstLevelTimestampSensor(PetHealthSensorBase):
         records = self._store.get_thirst_level_records(self._pet_id)
         if records:
             last_record = records[-1]
-            timestamp = last_record.timestamp
-            if timestamp.tzinfo is None:
-                timestamp = dt_util.as_utc(timestamp)
-            self._attr_native_value = timestamp
+            self._attr_native_value = _ensure_aware(last_record)
             self._attr_extra_state_attributes = {
                 **self._attr_extra_state_attributes,
                 "level": last_record.level,
@@ -949,10 +926,7 @@ class LastAppetiteLevelTimestampSensor(PetHealthSensorBase):
         records = self._store.get_appetite_level_records(self._pet_id)
         if records:
             last_record = records[-1]
-            timestamp = last_record.timestamp
-            if timestamp.tzinfo is None:
-                timestamp = dt_util.as_utc(timestamp)
-            self._attr_native_value = timestamp
+            self._attr_native_value = _ensure_aware(last_record)
             self._attr_extra_state_attributes = {
                 **self._attr_extra_state_attributes,
                 "level": last_record.level,
@@ -1010,10 +984,7 @@ class LastWeightTimestampSensor(PetHealthSensorBase):
         records = self._store.get_weight_records(self._pet_id)
         if records:
             last_record = records[-1]
-            timestamp = last_record.timestamp
-            if timestamp.tzinfo is None:
-                timestamp = dt_util.as_utc(timestamp)
-            self._attr_native_value = timestamp
+            self._attr_native_value = _ensure_aware(last_record)
             self._attr_extra_state_attributes = {
                 **self._attr_extra_state_attributes,
                 "weight_grams": last_record.weight_grams,
@@ -1141,10 +1112,7 @@ class LastVomitTimestampSensor(PetHealthSensorBase):
         records = self._store.get_vomit_records(self._pet_id)
         if records:
             last_record = records[-1]
-            timestamp = last_record.timestamp
-            if timestamp.tzinfo is None:
-                timestamp = dt_util.as_utc(timestamp)
-            self._attr_native_value = timestamp
+            self._attr_native_value = _ensure_aware(last_record)
             self._attr_extra_state_attributes = {
                 **self._attr_extra_state_attributes,
                 "vomit_type": last_record.vomit_type,
@@ -1225,7 +1193,7 @@ class WeeklyVomitCountSensor(PetHealthSensorBase):
         records = self._store.get_vomit_records(self._pet_id)
         week_ago = dt_util.now() - timedelta(days=7)
 
-        count = sum(1 for record in records if record.timestamp >= week_ago)
+        count = sum(1 for record in records if _ensure_aware(record) >= week_ago)
         self._attr_native_value = count
 
 
@@ -1250,10 +1218,7 @@ class LastBloodGlucoseTimestampSensor(PetHealthSensorBase):
         records = self._store.get_blood_glucose_records(self._pet_id)
         if records:
             last_record = _latest_record(records)
-            timestamp = last_record.timestamp
-            if timestamp.tzinfo is None:
-                timestamp = dt_util.as_utc(timestamp)
-            self._attr_native_value = timestamp
+            self._attr_native_value = _ensure_aware(last_record)
             self._attr_extra_state_attributes = {
                 **self._attr_extra_state_attributes,
                 "value": last_record.value,
@@ -1321,10 +1286,7 @@ class LastGlycatedHemoglobinTimestampSensor(PetHealthSensorBase):
         records = self._store.get_glycated_hemoglobin_records(self._pet_id)
         if records:
             last_record = _latest_record(records)
-            timestamp = last_record.timestamp
-            if timestamp.tzinfo is None:
-                timestamp = dt_util.as_utc(timestamp)
-            self._attr_native_value = timestamp
+            self._attr_native_value = _ensure_aware(last_record)
             self._attr_extra_state_attributes = {
                 **self._attr_extra_state_attributes,
                 "value": last_record.value,
@@ -1390,10 +1352,7 @@ class LastKetoneTimestampSensor(PetHealthSensorBase):
         records = self._store.get_ketone_records(self._pet_id)
         if records:
             last_record = _latest_record(records)
-            timestamp = last_record.timestamp
-            if timestamp.tzinfo is None:
-                timestamp = dt_util.as_utc(timestamp)
-            self._attr_native_value = timestamp
+            self._attr_native_value = _ensure_aware(last_record)
             self._attr_extra_state_attributes = {
                 **self._attr_extra_state_attributes,
                 "value": last_record.value,
@@ -1478,10 +1437,7 @@ class LastGenericLogTimestampSensor(PetHealthSensorBase):
         ]
         if category_logs:
             last_log = _latest_record(category_logs)
-            timestamp = last_log.timestamp
-            if timestamp.tzinfo is None:
-                timestamp = dt_util.as_utc(timestamp)
-            self._attr_native_value = timestamp
+            self._attr_native_value = _ensure_aware(last_log)
             self._attr_extra_state_attributes = {
                 **self._attr_extra_state_attributes,
                 "category": last_log.category,
@@ -1533,11 +1489,6 @@ class DailyGenericLogCountSensor(PetHealthSensorBase):
             if _matches_generic_log_category(
                 self._category_id, self._category_name, log
             )
-            and (
-                dt_util.as_utc(log.timestamp)
-                if log.timestamp.tzinfo is None
-                else log.timestamp
-            )
-            >= today_start
+            and _ensure_aware(log) >= today_start
         ]
         self._attr_native_value = len(category_logs_today)

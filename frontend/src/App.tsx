@@ -490,6 +490,10 @@ function App({ hass }: AppProps) {
   const [showWeightDialog, setShowWeightDialog] = useState(false);
   const [weightFormData, setWeightFormData] = useState({ weight_kg: '', notes: '', timestamp: '' });
 
+  // Vet visit dialog
+  const [showVetVisitDialog, setShowVetVisitDialog] = useState(false);
+  const [vetVisitFormData, setVetVisitFormData] = useState({ notes: '', weight_kg: '', timestamp: '' });
+
   // Vomit dialog
   const [showVomitDialog, setShowVomitDialog] = useState(false);
   const [vomitFormData, setVomitFormData] = useState({ vomit_type: 'other', notes: '', timestamp: '' });
@@ -947,6 +951,34 @@ function App({ hass }: AppProps) {
     }
   };
 
+  const submitLogVetVisit = async () => {
+    if (!api || !selectedPetId) return;
+    if (!vetVisitFormData.notes.trim()) {
+      alert('Please describe what was done during the vet visit');
+      return;
+    }
+    let weightGrams: number | undefined;
+    if (vetVisitFormData.weight_kg.trim()) {
+      const weightKg = parseFloat(vetVisitFormData.weight_kg);
+      if (isNaN(weightKg) || weightKg <= 0) {
+        alert('Please enter a valid weight, or leave it empty');
+        return;
+      }
+      weightGrams = Math.round(weightKg * 1000);
+    }
+    try {
+      const loggedAt = vetVisitFormData.timestamp ? new Date(vetVisitFormData.timestamp).toISOString() : undefined;
+      await api.logVetVisit(selectedPetId, vetVisitFormData.notes, weightGrams, loggedAt);
+      setShowVetVisitDialog(false);
+      setVetVisitFormData({ notes: '', weight_kg: '', timestamp: '' });
+      const data = await api.getStoreDump(selectedPetId);
+      setStoreData(data);
+    } catch (err) {
+      console.error('Failed to log vet visit:', err);
+      alert('Failed to log vet visit: ' + (err as Error).message);
+    }
+  };
+
   const submitLogVomit = async () => {
     if (!api || !selectedPetId) return;
     try {
@@ -1368,6 +1400,38 @@ function App({ hass }: AppProps) {
 
       {currentView === 'health' && selectedPet && (
         <div style={{display: "flex", flexDirection: "column", gap: "24px"}}>
+          {/* Vet Visits */}
+          <div style={styles.card}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
+              <h3 style={{...styles.h3, margin: 0, border: 'none', paddingBottom: 0}}>Vet Visits</h3>
+              <button style={styles.button} onClick={() => { setVetVisitFormData({ notes: '', weight_kg: '', timestamp: '' }); setShowVetVisitDialog(true); }}>
+                + Log Vet Visit
+              </button>
+            </div>
+            {storeData.generic_logs && storeData.generic_logs.filter((log: any) => log.category === 'vet_visit').length > 0 ? (
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Time</th>
+                    <th style={styles.th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeData.generic_logs
+                    .filter((log: any) => log.category === 'vet_visit')
+                    .map((log: any, idx: number) => (
+                      <tr key={log.log_id || idx} style={idx % 2 === 0 ? styles.tr : {...styles.tr, background: '#f9fafb'}}>
+                        <td style={styles.td}>{formatTimestamp(log.timestamp)}</td>
+                        <td style={styles.td}>{log.notes}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>No vet visits recorded yet.</p>
+            )}
+          </div>
+
           {/* Wellbeing */}
           <div style={styles.card}>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
@@ -2472,6 +2536,37 @@ function App({ hass }: AppProps) {
             <div style={styles.dialogButtons}>
               <button style={styles.actionButton} onClick={submitLogWeight}>Submit</button>
               <button style={styles.actionButton} onClick={() => setShowWeightDialog(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log Vet Visit Dialog */}
+      {showVetVisitDialog && (
+        <div style={styles.dialogOverlay} onClick={() => setShowVetVisitDialog(false)}>
+          <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <h2 style={styles.h2}>Log Vet Visit</h2>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                What was done:
+                <textarea value={vetVisitFormData.notes} onChange={(e) => setVetVisitFormData({...vetVisitFormData, notes: e.target.value})} rows={3} style={styles.input} placeholder="e.g. annual checkup, vaccination..." />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Weight (kg, optional):
+                <input type="number" step="0.01" min="0.1" value={vetVisitFormData.weight_kg} onChange={(e) => setVetVisitFormData({...vetVisitFormData, weight_kg: e.target.value})} style={styles.input} placeholder="e.g. 4.5" />
+              </label>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>
+                Time (leave empty for now):
+                <input type="datetime-local" value={vetVisitFormData.timestamp} onChange={(e) => setVetVisitFormData({...vetVisitFormData, timestamp: e.target.value})} style={styles.input} />
+              </label>
+            </div>
+            <div style={styles.dialogButtons}>
+              <button style={styles.actionButton} onClick={submitLogVetVisit}>Submit</button>
+              <button style={styles.actionButton} onClick={() => setShowVetVisitDialog(false)}>Cancel</button>
             </div>
           </div>
         </div>
