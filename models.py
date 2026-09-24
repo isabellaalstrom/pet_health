@@ -116,6 +116,7 @@ class MedicationRecord:
     medication_name: str
     dosage: str | None = None
     unit: str | None = None
+    frequency: str | None = None
     reason: str | None = None
     notes: str | None = None
 
@@ -127,6 +128,7 @@ class MedicationRecord:
             "medication_name": self.medication_name,
             "dosage": self.dosage,
             "unit": self.unit,
+            "frequency": self.frequency,
             "reason": self.reason,
             "notes": self.notes,
         }
@@ -140,6 +142,7 @@ class MedicationRecord:
             medication_name=data["medication_name"],
             dosage=data.get("dosage"),
             unit=data.get("unit"),
+            frequency=data.get("frequency"),
             reason=data.get("reason"),
             notes=data.get("notes"),
         )

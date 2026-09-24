@@ -10,7 +10,14 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 import logging
 
-from .const import DOMAIN, CONF_GENERIC_LOG_CATEGORIES
+from .const import (
+    CONF_CATEGORY_ID,
+    CONF_CATEGORY_NAME,
+    CONF_ENABLE_BATHROOM_VISITS,
+    CONF_GENERIC_LOG_CATEGORIES,
+    DEFAULT_GENERIC_LOG_CATEGORIES,
+    DOMAIN,
+)
 from .store import PetHealthStore
 
 
@@ -118,17 +125,28 @@ async def handle_get_pet_data(
                     "medication_name": med.get("medication_name"),
                     "dosage": med.get("dosage", ""),
                     "unit": med.get("unit", ""),
+                    "frequency": med.get("frequency", ""),
                 }
             )
 
-        # Include configured generic log categories for this pet
+        # Include generic log categories for this pet: configured + built-in
+        # defaults, de-duplicated by name so a configured category can
+        # override a default with the same name.
         pet_categories = []
         configured_categories = entry.options.get(CONF_GENERIC_LOG_CATEGORIES, [])
-        for cat in configured_categories:
+        seen_category_names: set[str] = set()
+        for cat in [*configured_categories, *DEFAULT_GENERIC_LOG_CATEGORIES]:
+            category_name = cat.get(CONF_CATEGORY_NAME)
+            if not category_name:
+                continue
+            category_key = category_name.casefold()
+            if category_key in seen_category_names:
+                continue
+            seen_category_names.add(category_key)
             pet_categories.append(
                 {
-                    "category_id": cat.get("category_id"),
-                    "category_name": cat.get("category_name"),
+                    "category_id": cat.get(CONF_CATEGORY_ID),
+                    "category_name": category_name,
                 }
             )
 
@@ -142,6 +160,9 @@ async def handle_get_pet_data(
                 "pet_name": entry.data.get("pet_name"),
                 "pet_type": entry.data.get("pet_type"),
                 "pet_image_path": entry.data.get("pet_image_path"),
+                "enable_bathroom_visits": entry.options.get(
+                    CONF_ENABLE_BATHROOM_VISITS, True
+                ),
                 "data": {
                     "pet_id": entry.data.get("pet_id"),
                     "pet_name": entry.data.get("pet_name"),
@@ -194,6 +215,7 @@ async def handle_get_medications(
             "medication_name": med.medication_name,
             "dosage": med.dosage,
             "unit": med.unit,
+            "frequency": med.frequency,
             "notes": med.notes,
         }
         for med in all_medications

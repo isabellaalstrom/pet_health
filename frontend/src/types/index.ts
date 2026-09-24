@@ -17,6 +17,7 @@ export interface PetEntry {
   name?: string;
   pet_type?: string;
   pet_image_path?: string;
+  enable_bathroom_visits?: boolean;
   medications?: Medication[];
   generic_log_categories?: Category[];
 }
@@ -59,6 +60,7 @@ export interface Medication {
   medication_name: string;
   dosage?: string;
   unit?: string;
+  frequency?: string;
 }
 
 export interface MedicationLog {
@@ -67,6 +69,7 @@ export interface MedicationLog {
   medication_name: string;  // API returns this field name
   dosage?: string;
   unit?: string;
+  frequency?: string;
   notes?: string;
 }
 
