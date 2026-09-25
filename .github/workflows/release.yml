@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version number (e.g., 0.3.1)'
-        required: true
+        description: 'Version number (e.g., 0.3.1). Leave empty to auto-bump the patch version.'
+        required: false
         type: string
   pull_request:
     types:
@@ -15,11 +15,10 @@ on:
 
 jobs:
   release:
-    # Only run on merged PRs or manual dispatch
+    # Run on every PR merged to main, or on manual dispatch
     if: |
-      github.event_name == 'workflow_dispatch' || 
-      (github.event.pull_request.merged == true && 
-       contains(github.event.pull_request.labels.*.name, 'release'))
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -28,6 +27,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: main  # Build from main's actual HEAD after the merge, not the PR's merge-test ref
           fetch-depth: 0  # Fetch all history for proper release notes
       
       - name: Set up Node.js
@@ -38,17 +38,24 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
+            # Manual dispatch with an explicit version
             VERSION="${{ inputs.version }}"
           else
-            # Extract version from manifest.json
-            VERSION=$(grep -oP '"version":\s*"\K[^"]+' manifest.json)
+            # Auto-bump the patch number, e.g. 0.20.0-beta -> 0.20.1-beta
+            CURRENT=$(grep -oP '"version":\s*"\K[^"]+' manifest.json)
+            BASE="${CURRENT%%-*}"
+            SUFFIX="${CURRENT#$BASE}"
+            MAJOR=$(echo "$BASE" | cut -d. -f1)
+            MINOR=$(echo "$BASE" | cut -d. -f2)
+            PATCH=$(echo "$BASE" | cut -d. -f3)
+            PATCH=$((PATCH + 1))
+            VERSION="${MAJOR}.${MINOR}.${PATCH}${SUFFIX}"
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Determined version: $VERSION"
-      
+
       - name: Update version in manifest files
-        if: github.event_name == 'workflow_dispatch'
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
           # Update manifest.json
@@ -86,7 +93,6 @@ jobs:
           ls -lh ../www/pet-health-panel.js
       
       - name: Commit version updates
-        if: github.event_name == 'workflow_dispatch'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -111,7 +117,8 @@ jobs:
         id: release_notes
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
-          PREV_TAG=$(git tag --sort=-version:refname | head -n 1 || echo "")
+          # Exclude the tag we just created so this points at the actual previous release
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^v${VERSION}$" | head -n 1 || echo "")
           
           if [ -z "$PREV_TAG" ]; then
             NOTES="## What's Changed\n\nInitial release\n\n## Installation\n\n1. Download the zip file\n2. Extract to your Home Assistant \`custom_components\` directory\n3. Restart Home Assistant\n4. Add the Pet Health integration via Settings → Devices & Services"
